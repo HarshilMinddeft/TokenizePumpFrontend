@@ -1,0 +1,113 @@
+{
+  "abi": [
+    {
+      "inputs": [],
+      "name": "BPS_DENOMINATOR",
+      "outputs": [
+        {
+          "internalType": "uint16",
+          "name": "",
+          "type": "uint16"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "currentFeeVersion",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "version",
+          "type": "uint256"
+        }
+      ],
+      "name": "feeScheduleHash",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "version",
+          "type": "uint256"
+        }
+      ],
+      "name": "getFeeConfig",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint16",
+              "name": "saleFeeBps",
+              "type": "uint16"
+            },
+            {
+              "internalType": "uint16",
+              "name": "saleServicerFeeBps",
+              "type": "uint16"
+            },
+            {
+              "internalType": "uint16",
+              "name": "interestFeeBps",
+              "type": "uint16"
+            },
+            {
+              "internalType": "uint16",
+              "name": "interestServicerFeeBps",
+              "type": "uint16"
+            },
+            {
+              "internalType": "uint16",
+              "name": "foreclosureFeeBps",
+              "type": "uint16"
+            },
+            {
+              "internalType": "uint16",
+              "name": "preSaleProfitSharingBps",
+              "type": "uint16"
+            }
+          ],
+          "internalType": "struct IFeeManager.FeeConfig",
+          "name": "",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "treasury",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ]
+}

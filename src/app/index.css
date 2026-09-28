@@ -1,0 +1,259 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+@import 'tailwindcss';
+
+/*
+ * The VARELO station landing page's design tokens and utilities
+ * (station-* @theme tokens, `panel`/`kicker`/`tile` @utility classes) live
+ * in src/features/landing/landing.css. `@tailwindcss/vite` only processes
+ * the CSS module graph reachable from this file's `@import 'tailwindcss'`,
+ * so that file must be @import-ed here too — a plain JS-side `import
+ * './landing.css'` in a component (as StationLanding.jsx also does, for
+ * Vite's own bundling) is invisible to the Tailwind compiler, which is why
+ * those utilities weren't actually being generated.
+ */
+@import '../features/landing/landing.css';
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/*
+ * Tailwind's `slate` and `indigo` scales are remapped to CSS custom properties so
+ * the utility classes used across the app render a refined, theme-specific
+ * palette. Light mode is the primary experience — crisp cool-grey surfaces, a
+ * violet-indigo accent and hairline borders. Dark mode keeps stock Tailwind
+ * scales so `dark:` overrides compose cleanly.
+ */
+@theme inline {
+  --color-slate-50: var(--tf-slate-50);
+  --color-slate-100: var(--tf-slate-100);
+  --color-slate-200: var(--tf-slate-200);
+  --color-slate-300: var(--tf-slate-300);
+  --color-slate-400: var(--tf-slate-400);
+  --color-slate-500: var(--tf-slate-500);
+  --color-slate-600: var(--tf-slate-600);
+  --color-slate-700: var(--tf-slate-700);
+  --color-slate-800: var(--tf-slate-800);
+  --color-slate-900: var(--tf-slate-900);
+  --color-slate-950: var(--tf-slate-950);
+
+  --color-indigo-50: var(--tf-indigo-50);
+  --color-indigo-100: var(--tf-indigo-100);
+  --color-indigo-200: var(--tf-indigo-200);
+  --color-indigo-300: var(--tf-indigo-300);
+  --color-indigo-400: var(--tf-indigo-400);
+  --color-indigo-500: var(--tf-indigo-500);
+  --color-indigo-600: var(--tf-indigo-600);
+  --color-indigo-700: var(--tf-indigo-700);
+  --color-indigo-800: var(--tf-indigo-800);
+  --color-indigo-900: var(--tf-indigo-900);
+  --color-indigo-950: var(--tf-indigo-950);
+
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --animate-shimmer: tf-shimmer 1.6s linear infinite;
+  --animate-fade-in: tf-fade-in 0.4s ease-out both;
+  --animate-scale-in: tf-scale-in 0.25s ease-out both;
+}
+
+@keyframes tf-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes tf-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes tf-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+:root,
+[data-theme='dark'] {
+  /* Stock Tailwind scales (unchanged in dark mode) */
+  --tf-slate-50: #f8fafc;
+  --tf-slate-100: #f1f5f9;
+  --tf-slate-200: #e2e8f0;
+  --tf-slate-300: #cbd5e1;
+  --tf-slate-400: #94a3b8;
+  --tf-slate-500: #64748b;
+  --tf-slate-600: #475569;
+  --tf-slate-700: #334155;
+  --tf-slate-800: #1e293b;
+  --tf-slate-900: #0f172a;
+  --tf-slate-950: #020617;
+
+  --tf-indigo-50: #eef2ff;
+  --tf-indigo-100: #e0e7ff;
+  --tf-indigo-200: #c7d2fe;
+  --tf-indigo-300: #a5b4fc;
+  --tf-indigo-400: #818cf8;
+  --tf-indigo-500: #6366f1;
+  --tf-indigo-600: #4f46e5;
+  --tf-indigo-700: #4338ca;
+  --tf-indigo-800: #3730a3;
+  --tf-indigo-900: #312e81;
+  --tf-indigo-950: #1e1b4b;
+}
+
+[data-theme='light'] {
+  /* Premium light palette — cool near-white page, crisp white surfaces,
+     violet-indigo accent. */
+  --tf-slate-50: #f6f6f9;
+  --tf-slate-100: #efeff4;
+  --tf-slate-200: #e3e4ec;
+  --tf-slate-300: #d0d2dd;
+  --tf-slate-400: #a2a5b6;
+  --tf-slate-500: #73768a;
+  --tf-slate-600: #575a6e;
+  --tf-slate-700: #3f4154;
+  --tf-slate-800: #2b2d3d;
+  --tf-slate-900: #1c1d2b;
+  --tf-slate-950: #10111c;
+
+  --tf-indigo-50: #f4f1ff;
+  --tf-indigo-100: #ebe5ff;
+  --tf-indigo-200: #d9cdff;
+  --tf-indigo-300: #c0a8ff;
+  --tf-indigo-400: #a17eff;
+  --tf-indigo-500: #8557fb;
+  --tf-indigo-600: #6d3ff0;
+  --tf-indigo-700: #5a30cf;
+  --tf-indigo-800: #4826a5;
+  --tf-indigo-900: #3b2083;
+  --tf-indigo-950: #241153;
+}
+
+:root {
+  font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+}
+
+:root,
+[data-theme='dark'] {
+  color-scheme: dark;
+  background-color: #020617;
+  color: #f1f5f9;
+}
+
+[data-theme='light'] {
+  color-scheme: light;
+  background-color: var(--tf-slate-50);
+  color: var(--tf-slate-950);
+}
+
+::selection {
+  background: color-mix(in srgb, var(--tf-indigo-500) 25%, transparent);
+}
+
+/* Theme-switch ripple: disable the browser's default crossfade so only our
+   circular clip-path animation (see ThemeContext.jsx) plays. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+::view-transition-old(root) {
+  z-index: 1;
+}
+
+::view-transition-new(root) {
+  z-index: 2;
+}
+
+/* ---------- App-level helpers ---------- */
+
+.text-gradient {
+  background: linear-gradient(115deg, var(--tf-indigo-600) 0%, #8b5cf6 55%, #d946ef 120%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+[data-theme='dark'] .text-gradient {
+  background: linear-gradient(115deg, var(--tf-indigo-400) 0%, #a78bfa 55%, #e879f9 120%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.bg-page {
+  background-color: var(--tf-slate-50);
+}
+
+[data-theme='dark'] .bg-page {
+  background-color: var(--tf-slate-950);
+}
+
+/* Soft dotted/grid backdrop used behind page heroes */
+.bg-grid-faint {
+  background-image: radial-gradient(circle, color-mix(in srgb, var(--tf-indigo-500) 14%, transparent) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+/* Skeleton shimmer surface */
+.shimmer-bg {
+  background: linear-gradient(
+    110deg,
+    var(--tf-slate-100) 8%,
+    var(--tf-slate-200) 18%,
+    var(--tf-slate-100) 33%
+  );
+  background-size: 200% 100%;
+  animation: tf-shimmer 1.6s linear infinite;
+}
+
+[data-theme='dark'] .shimmer-bg {
+  background: linear-gradient(110deg, #1e293b 8%, #273449 18%, #1e293b 33%);
+  background-size: 200% 100%;
+  animation: tf-shimmer 1.6s linear infinite;
+}
+
+/* Subtle scrollbars for panels */
+.tf-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--tf-slate-300) transparent;
+}
+.tf-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.tf-scroll::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: var(--tf-slate-300);
+}
+[data-theme='dark'] .tf-scroll::-webkit-scrollbar-thumb {
+  background: #334155;
+}
+
+/* Hide number input spinners */
+input[type='number']::-webkit-outer-spin-button,
+input[type='number']::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type='number'] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}

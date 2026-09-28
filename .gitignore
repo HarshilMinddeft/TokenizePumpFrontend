@@ -1,0 +1,27 @@
+node_modules
+.env
+.env.local
+.env.*.local
+
+# Hardhat files
+/cache
+/artifacts
+
+# TypeChain files
+/typechain
+/typechain-types
+
+# solidity-coverage files
+/coverage
+/coverage.json
+
+# Hardhat Ignition default folder for deployments against a local node
+ignition/deployments/chain-31337
+dist
+/src/artifacts
+
+# 3D station scene model files (~82MB, uncompressed prototype exports).
+# Present on disk for local dev; not committed until the model-compression
+# pass (Draco/Meshopt) produces much smaller versions worth keeping in git
+# history long-term. See public/station/README or the landing-page port plan.
+public/station/uploads/*.glb

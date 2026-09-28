@@ -1,0 +1,90 @@
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap');
+
+/*
+ * VARELO tokenized-station landing page design tokens.
+ *
+ * Tailwind v4's `@theme` is inherently global — there is no per-route
+ * scoping mechanism. The rest of the app already registers its own
+ * `@theme inline` (src/app/index.css) for the slate/indigo palette used by
+ * the Web3/marketplace/property pages. This page's palette (espresso/gold/
+ * sand, always-dark) is a different visual system entirely, so every token
+ * here is namespaced under `station-*` (e.g. `--color-station-gold` ->
+ * `text-station-gold`, `bg-station-panel`). That keeps the generated
+ * utilities collision-free with the rest of the app while still reading
+ * naturally in components, and lets `hover:`/`rtl:`/etc. variants compose
+ * normally (they don't with plain hand-rolled CSS classes).
+ */
+@theme {
+  --color-station-panel: rgba(26, 20, 14, 0.84);
+  --color-station-gold: #e3b766;
+  --color-station-sand: #e8d3a6;
+  --color-station-stream-a: #e8d3a6;
+  --color-station-stream-b: #ffb44a;
+  --color-station-stream-c: #5ccf8e;
+  --color-station-ink: #eef1f7;
+  --color-station-body: #cfd6e6;
+  --color-station-muted: #aab3c9;
+
+  --font-station-display: 'Bricolage Grotesque', 'IBM Plex Sans Arabic', sans-serif;
+  --font-station-sans: 'IBM Plex Sans', 'IBM Plex Sans Arabic', system-ui, sans-serif;
+  --font-station-mono: 'IBM Plex Mono', 'IBM Plex Sans Arabic', monospace;
+}
+
+@utility panel {
+  background: var(--color-station-panel);
+  border: 1px solid rgba(227, 183, 102, 0.28);
+  border-radius: 20px;
+  backdrop-filter: blur(14px);
+}
+
+@utility kicker {
+  font-family: var(--font-station-mono);
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-station-sand);
+}
+
+@utility tile {
+  background: rgba(227, 183, 102, 0.07);
+  border: 1px solid rgba(227, 183, 102, 0.18);
+  border-radius: 12px;
+}
+
+.station-landing {
+  position: relative;
+  min-height: 100vh;
+  font-family: var(--font-station-sans);
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--color-station-ink);
+  background: #060b1f;
+}
+
+.station-landing a {
+  color: var(--color-station-gold);
+  text-decoration: none;
+}
+.station-landing a:hover {
+  color: var(--color-station-sand);
+}
+.station-landing ::selection {
+  background: var(--color-station-gold);
+  color: #060b1f;
+}
+
+@keyframes sahmPulse {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: translateY(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(6px);
+  }
+}
+
+.station-landing .animate-sahm-pulse {
+  animation: sahmPulse 2s ease-in-out infinite;
+}

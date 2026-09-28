@@ -1,0 +1,46 @@
+{
+  "name": "ai-predictor",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "lint": "eslint .",
+    "preview": "vite preview",
+    "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,md}\"",
+    "check-format": "prettier --check ."
+  },
+  "dependencies": {
+    "@leenguyen/react-flip-clock-countdown": "^1.7.2",
+    "@tailwindcss/vite": "^4.0.7",
+    "@web3modal/ethers5": "^5.1.11",
+    "axios": "^1.10.0",
+    "ethers": "^5.7.0",
+    "flowbite": "^3.1.2",
+    "motion": "^13.2.0",
+    "prettier-plugin-tailwindcss": "^0.8.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-router-dom": "^7.2.0",
+    "react-slick": "^0.30.3",
+    "react-toastify": "^11.0.5",
+    "react-type-animation": "^3.2.0",
+    "slick-carousel": "^1.8.1",
+    "tailwindcss": "^4.0.7",
+    "three": "^0.184.0",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.19.0",
+    "@types/react": "^19.0.8",
+    "@types/react-dom": "^19.0.3",
+    "@vitejs/plugin-react": "^4.3.4",
+    "eslint": "^9.19.0",
+    "eslint-plugin-react": "^7.37.4",
+    "eslint-plugin-react-hooks": "^5.0.0",
+    "eslint-plugin-react-refresh": "^0.4.18",
+    "globals": "^15.14.0",
+    "vite": "^6.1.0"
+  }
+}
