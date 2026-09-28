@@ -61,12 +61,20 @@
   background: #060b1f;
 }
 
+/*
+ * The original prototype set a blanket `a{color:#e3b766}` base style and
+ * overrode it per-link with inline `style` (which always wins over a bare
+ * tag selector). Every link in the port instead carries an explicit
+ * Tailwind text-color utility, matching what each link actually renders as
+ * in the prototype — so no base `a` color rule here: a plain CSS selector
+ * like `.station-landing a { color: ... }` has higher specificity than
+ * Tailwind's utilities (deliberately low-specificity by design) and would
+ * silently override every one of them, which is exactly what happened
+ * before this was removed. `text-decoration: none` alone is safe to keep
+ * global since no link in the design ever wants an underline.
+ */
 .station-landing a {
-  color: var(--color-station-gold);
   text-decoration: none;
-}
-.station-landing a:hover {
-  color: var(--color-station-sand);
 }
 .station-landing ::selection {
   background: var(--color-station-gold);
