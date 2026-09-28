@@ -38,8 +38,8 @@ const WithdrawCard = ({ listing, onWithdraw }) => {
 
   const clockColors =
     theme === 'light'
-      ? { label: '#64748b', digitBg: '#eef2ff', digitText: '#312e81', divider: '#c7d2fe', separator: '#6366f1' }
-      : { label: '#94a3b8', digitBg: '#1e1b4b', digitText: '#e2e8f0', divider: '#312e81', separator: '#818cf8' };
+      ? { label: '#7c6e5b', digitBg: '#fcf6ea', digitText: '#5d3f15', divider: '#eed7a6', separator: '#b8862f' }
+      : { label: '#aab3c9', digitBg: '#2b1f0c', digitText: '#f2d9a6', divider: '#4a3414', separator: '#e3b766' };
 
   const handle = async () => {
     setBusy(true);

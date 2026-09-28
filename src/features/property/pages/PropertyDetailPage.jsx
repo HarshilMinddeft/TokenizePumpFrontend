@@ -998,16 +998,16 @@ const PropertyDetailPage = ({ isPublic = false }) => {
             </Card>
           ) : (
             <Card className="overflow-hidden">
-              <div className="bg-gradient-to-br from-indigo-600 to-violet-600 p-5 text-white dark:from-indigo-500 dark:to-violet-500">
+              <div className="btn-gold p-5">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-[11px] font-bold tracking-[0.12em] text-white/70 uppercase">Buy tokens</p>
-                    <p className="mt-1 text-[26px] leading-none font-bold tracking-tight tabular-nums">
+                    <p className="font-mono text-[11px] font-medium tracking-[0.16em] uppercase opacity-70">Buy tokens</p>
+                    <p className="font-display mt-1 text-[28px] leading-none font-extrabold tracking-tight tabular-nums">
                       {formatUsd(listing.pricePerToken)}
                     </p>
-                    <p className="mt-1 text-xs text-white/70">per token</p>
+                    <p className="mt-1 text-xs opacity-70">per token</p>
                   </div>
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15 backdrop-blur">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-black/10 ring-1 ring-black/10">
                     <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182.552-.44 1.278-.659 2.003-.659.725 0 1.45.22 2.003.659L14.5 8.5" />
                     </svg>

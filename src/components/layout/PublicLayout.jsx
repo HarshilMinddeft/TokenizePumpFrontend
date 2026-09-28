@@ -19,23 +19,32 @@ const PublicLayout = ({ children, maxWidth = '1180px' }) => {
 
   useEffect(() => {
     const meta = getPageMeta(location.pathname);
-    document.title = `${meta.title} · TrueFraction`;
+    document.title = `${meta.title} · VARELO`;
   }, [location.pathname]);
 
   return (
-    <div className="min-h-screen bg-page text-slate-950 dark:bg-slate-950 dark:text-slate-100">
+    <div className="isolate min-h-screen bg-page text-slate-950 dark:bg-slate-950 dark:text-slate-100">
+      <div className="app-ambient" aria-hidden="true">
+        <div className="app-ambient-grid" />
+      </div>
+
       <div className="flex min-h-screen flex-col">
         <PublicTopBar />
 
         <main className="flex-1">
-          <div className="mx-auto w-full px-4 py-6 sm:px-6 sm:py-8 lg:px-8" style={{ maxWidth }}>
+          {/* Keyed on the route so each page fades up as it arrives. */}
+          <div
+            key={location.pathname}
+            className="animate-page-in mx-auto w-full px-4 py-6 sm:px-6 sm:py-8 lg:px-8"
+            style={{ maxWidth }}
+          >
             {children}
           </div>
         </main>
 
         <footer className="border-t border-slate-200/70 py-5 dark:border-slate-800/70">
           <p className="px-4 text-center text-xs text-slate-400 dark:text-slate-500">
-            TrueFraction — fractionalized real-world assets on Robinhood · Demo environment
+            VARELO — fractionalized real-world assets on Robinhood · Demo environment
           </p>
         </footer>
       </div>

@@ -22,7 +22,7 @@ const robinhoodTestnet = {
 };
 
 const metadata = {
-  name: 'TrueFraction RWA',
+  name: 'VARELO RWA',
   description: 'Fractional Real World Asset Tokenization Platform',
   url: typeof window !== 'undefined' ? window.location.origin : 'https://truefraction.io',
   icons: ['/logoD.webp'],
@@ -39,6 +39,11 @@ createWeb3Modal({
   chains: [robinhoodTestnet],
   projectId,
   themeMode: 'light',
+  // Match the VARELO gold accent instead of the modal's default blue.
+  themeVariables: {
+    '--w3m-accent': '#b8862f',
+    '--w3m-font-family': "'IBM Plex Sans', system-ui, sans-serif",
+  },
 });
 
 const Web3Context = createContext({

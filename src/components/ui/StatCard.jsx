@@ -18,7 +18,12 @@ const TONES = {
  * @param {('neutral'|'brand'|'success'|'danger'|'warning')} [tone]
  */
 const StatCard = ({ label, value, sub, icon, tone = 'brand', className = '' }) => (
-  <Card className={cn('relative h-full overflow-hidden p-4 sm:p-5', className)}>
+  <Card hover className={cn('relative h-full overflow-hidden p-4 sm:p-5', className)}>
+    {/* Gold hairline across the top edge, brightest in the middle. */}
+    <span
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-indigo-400/70 to-transparent"
+    />
     <div
       className={cn(
         'pointer-events-none absolute -top-10 -right-10 h-24 w-24 rounded-full opacity-60 blur-2xl',
@@ -30,10 +35,10 @@ const StatCard = ({ label, value, sub, icon, tone = 'brand', className = '' }) =
     />
     <div className="relative flex h-full items-start justify-between gap-3">
       <div className="flex min-w-0 flex-1 flex-col">
-        <p className="line-clamp-2 min-h-[2em] text-xs leading-tight font-semibold tracking-wide text-slate-400 uppercase dark:text-slate-500">
+        <p className="line-clamp-2 min-h-[2em] font-mono text-[11px] leading-tight font-medium tracking-[0.1em] text-slate-400 uppercase dark:text-slate-400">
           {label}
         </p>
-        <p className="mt-2 truncate text-xl leading-none font-bold tracking-tight text-slate-900 tabular-nums sm:text-2xl dark:text-white">
+        <p className="font-display mt-2 truncate text-xl leading-none font-bold tracking-tight text-slate-900 tabular-nums sm:text-2xl dark:text-white">
           {value}
         </p>
         <p className="mt-1.5 min-h-[1em] truncate text-xs text-slate-400 dark:text-slate-500">{sub}</p>

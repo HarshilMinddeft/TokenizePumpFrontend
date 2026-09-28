@@ -1,4 +1,13 @@
-@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap');
+/*
+ * The Google Fonts @import for this page's fonts (Bricolage Grotesque, IBM
+ * Plex Sans/Sans Arabic/Mono) lives in src/app/index.css, not here. `@import`
+ * rules are only honored by the browser when they're the first rules in the
+ * final stylesheet — once this file's contents are inlined into index.css
+ * (via its own `@import '../features/landing/landing.css'`), anything after
+ * index.css's `@import 'tailwindcss'` no longer qualifies, so an @import
+ * here would be silently dropped. Confirmed via document.styleSheets that
+ * it was in fact being dropped before this was moved.
+ */
 
 /*
  * VARELO tokenized-station landing page design tokens.
@@ -30,7 +39,24 @@
   --font-station-mono: 'IBM Plex Mono', 'IBM Plex Sans Arabic', monospace;
 }
 
+/*
+ * `content-box` here is deliberate, not a default left in place. Every
+ * `.panel` element pairs a `w-[min(Npx,100%)]` utility with this class's
+ * own padding, exactly mirroring the prototype's
+ * `width:min(Npx,100%);padding:clamp(24px,3vw,40px)` — and the prototype
+ * relies on the plain-CSS default box-sizing (content-box), where that
+ * width is the content box and padding is added on top. Tailwind's
+ * Preflight sets `box-sizing:border-box` globally, which would instead
+ * subtract the padding from that same width — shrinking every panel's
+ * content area by ~80px and making text wrap onto extra lines, which is
+ * exactly the "boxes are too narrow / too tall" bug this comment is
+ * guarding against. Confirmed against the original by comparing computed
+ * h2 widths inside a Concept-section panel: 460px there vs 378px here
+ * before this fix (460 minus the ~82px of padding Tailwind's border-box
+ * was double-subtracting).
+ */
 @utility panel {
+  box-sizing: content-box;
   background: var(--color-station-panel);
   border: 1px solid rgba(227, 183, 102, 0.28);
   border-radius: 20px;

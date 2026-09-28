@@ -145,7 +145,7 @@ export const getPageMeta = (pathname) => {
   if (pathname.startsWith('/properties/') || pathname.startsWith('/app/properties/')) {
     return { title: 'Property details', section: 'Marketplace' };
   }
-  return PAGE_META[pathname] || { title: 'Dashboard', section: 'TrueFraction' };
+  return PAGE_META[pathname] || { title: 'Dashboard', section: 'VARELO' };
 };
 
 export const flattenNavItems = (isAdmin) =>

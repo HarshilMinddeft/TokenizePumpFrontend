@@ -1,4 +1,7 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+/* VARELO type system, shared by the landing page and the app shell. Must be
+   imported here, at the top, not in landing.css itself; see the comment
+   there for why. */
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700;12..96,800&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 @import 'tailwindcss';
 
 /*
@@ -16,11 +19,14 @@
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 /*
- * Tailwind's `slate` and `indigo` scales are remapped to CSS custom properties so
- * the utility classes used across the app render a refined, theme-specific
- * palette. Light mode is the primary experience — crisp cool-grey surfaces, a
- * violet-indigo accent and hairline borders. Dark mode keeps stock Tailwind
- * scales so `dark:` overrides compose cleanly.
+ * Tailwind's `slate`, `indigo` and `violet` scales are remapped to CSS custom
+ * properties so the utility classes used across the app (marketplace, admin
+ * pages) render the VARELO palette from the landing page without touching
+ * each component:
+ *   slate  -> espresso/sand neutrals (dark mode keeps the landing page's cool
+ *             ink greys at the light end, for text on espresso surfaces)
+ *   indigo -> VARELO gold (the primary accent)
+ *   violet -> amber, gold's partner in the two-tone gradients
  */
 @theme inline {
   --color-slate-50: var(--tf-slate-50);
@@ -47,12 +53,28 @@
   --color-indigo-900: var(--tf-indigo-900);
   --color-indigo-950: var(--tf-indigo-950);
 
-  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --color-violet-50: var(--tf-violet-50);
+  --color-violet-100: var(--tf-violet-100);
+  --color-violet-200: var(--tf-violet-200);
+  --color-violet-300: var(--tf-violet-300);
+  --color-violet-400: var(--tf-violet-400);
+  --color-violet-500: var(--tf-violet-500);
+  --color-violet-600: var(--tf-violet-600);
+  --color-violet-700: var(--tf-violet-700);
+  --color-violet-800: var(--tf-violet-800);
+  --color-violet-900: var(--tf-violet-900);
+  --color-violet-950: var(--tf-violet-950);
+
+  --font-sans: 'IBM Plex Sans', 'IBM Plex Sans Arabic', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-display: 'Bricolage Grotesque', 'IBM Plex Sans Arabic', sans-serif;
 
   --animate-shimmer: tf-shimmer 1.6s linear infinite;
   --animate-fade-in: tf-fade-in 0.4s ease-out both;
   --animate-scale-in: tf-scale-in 0.25s ease-out both;
+  --animate-page-in: tf-page-in 0.5s cubic-bezier(0.2, 0.75, 0.2, 1) both;
+  --animate-float: tf-float 5s ease-in-out infinite;
+  --animate-spin-slow: spin 14s linear infinite;
 }
 
 @keyframes tf-shimmer {
@@ -84,76 +106,147 @@
   }
 }
 
+@keyframes tf-page-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes tf-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
 :root,
 [data-theme='dark'] {
-  /* Stock Tailwind scales (unchanged in dark mode) */
-  --tf-slate-50: #f8fafc;
-  --tf-slate-100: #f1f5f9;
-  --tf-slate-200: #e2e8f0;
-  --tf-slate-300: #cbd5e1;
-  --tf-slate-400: #94a3b8;
-  --tf-slate-500: #64748b;
-  --tf-slate-600: #475569;
-  --tf-slate-700: #334155;
-  --tf-slate-800: #1e293b;
-  --tf-slate-900: #0f172a;
-  --tf-slate-950: #020617;
+  /* Espresso night — the landing page's panel colours, with its cool ink
+     greys (#eef1f7 / #cfd6e6 / #aab3c9) at the light end for text. */
+  --tf-slate-50: #f7f8fb;
+  --tf-slate-100: #eef1f7;
+  --tf-slate-200: #dfe4ef;
+  --tf-slate-300: #cfd6e6;
+  --tf-slate-400: #aab3c9;
+  --tf-slate-500: #8a7f70;
+  --tf-slate-600: #5f5244;
+  --tf-slate-700: #3f3328;
+  --tf-slate-800: #2d231a;
+  --tf-slate-900: #1a140e;
+  --tf-slate-950: #0f0b08;
 
-  --tf-indigo-50: #eef2ff;
-  --tf-indigo-100: #e0e7ff;
-  --tf-indigo-200: #c7d2fe;
-  --tf-indigo-300: #a5b4fc;
-  --tf-indigo-400: #818cf8;
-  --tf-indigo-500: #6366f1;
-  --tf-indigo-600: #4f46e5;
-  --tf-indigo-700: #4338ca;
-  --tf-indigo-800: #3730a3;
-  --tf-indigo-900: #312e81;
-  --tf-indigo-950: #1e1b4b;
+  /* VARELO gold; 400 is the landing page's #e3b766 */
+  --tf-indigo-50: #fbf6ea;
+  --tf-indigo-100: #f6ebd2;
+  --tf-indigo-200: #f2d9a6;
+  --tf-indigo-300: #ecc987;
+  --tf-indigo-400: #e3b766;
+  --tf-indigo-500: #d6a24c;
+  --tf-indigo-600: #bb8634;
+  --tf-indigo-700: #946827;
+  --tf-indigo-800: #6c4c1d;
+  --tf-indigo-900: #4a3414;
+  --tf-indigo-950: #2b1f0c;
+
+  /* Amber; 400 is the landing page's stream-B #ffb44a */
+  --tf-violet-50: #fdf3e6;
+  --tf-violet-100: #fbe3c2;
+  --tf-violet-200: #f8cf95;
+  --tf-violet-300: #ffc56f;
+  --tf-violet-400: #ffb44a;
+  --tf-violet-500: #f59e2e;
+  --tf-violet-600: #d9831c;
+  --tf-violet-700: #ad6415;
+  --tf-violet-800: #7f4a12;
+  --tf-violet-900: #55320e;
+  --tf-violet-950: #2f1c08;
+
+  /* Gold fill for primary actions; always dark text on it, as on the
+     landing page's CTAs. */
+  --tf-gold-from: #ecc987;
+  --tf-gold-to: #d6a24c;
+  --tf-on-gold: #1a140e;
+  --tf-glow: rgba(227, 183, 102, 0.35);
+  --tf-hairline: rgba(227, 183, 102, 0.16);
 }
 
 [data-theme='light'] {
-  /* Premium light palette — cool near-white page, crisp white surfaces,
-     violet-indigo accent. */
-  --tf-slate-50: #f6f6f9;
-  --tf-slate-100: #efeff4;
-  --tf-slate-200: #e3e4ec;
-  --tf-slate-300: #d0d2dd;
-  --tf-slate-400: #a2a5b6;
-  --tf-slate-500: #73768a;
-  --tf-slate-600: #575a6e;
-  --tf-slate-700: #3f4154;
-  --tf-slate-800: #2b2d3d;
-  --tf-slate-900: #1c1d2b;
-  --tf-slate-950: #10111c;
+  /* Desert daylight — warm ivory surfaces, espresso text, bronze-gold
+     accent (a shade deeper than on dark so it still reads on ivory). */
+  --tf-slate-50: #faf7f1;
+  --tf-slate-100: #f3ede2;
+  --tf-slate-200: #e7ddcc;
+  --tf-slate-300: #d4c6b0;
+  --tf-slate-400: #a99a83;
+  --tf-slate-500: #7c6e5b;
+  --tf-slate-600: #5e5243;
+  --tf-slate-700: #463c31;
+  --tf-slate-800: #30281f;
+  --tf-slate-900: #211b14;
+  --tf-slate-950: #15100b;
 
-  --tf-indigo-50: #f4f1ff;
-  --tf-indigo-100: #ebe5ff;
-  --tf-indigo-200: #d9cdff;
-  --tf-indigo-300: #c0a8ff;
-  --tf-indigo-400: #a17eff;
-  --tf-indigo-500: #8557fb;
-  --tf-indigo-600: #6d3ff0;
-  --tf-indigo-700: #5a30cf;
-  --tf-indigo-800: #4826a5;
-  --tf-indigo-900: #3b2083;
-  --tf-indigo-950: #241153;
+  --tf-indigo-50: #fcf6ea;
+  --tf-indigo-100: #f7ead0;
+  --tf-indigo-200: #eed7a6;
+  --tf-indigo-300: #e2bd72;
+  --tf-indigo-400: #d2a04a;
+  --tf-indigo-500: #b8862f;
+  --tf-indigo-600: #8c6220;
+  --tf-indigo-700: #71501b;
+  --tf-indigo-800: #5d3f15;
+  --tf-indigo-900: #432e10;
+  --tf-indigo-950: #281b09;
+
+  --tf-violet-50: #fdf2e4;
+  --tf-violet-100: #fbe1bd;
+  --tf-violet-200: #f6c98c;
+  --tf-violet-300: #eeab57;
+  --tf-violet-400: #e0902f;
+  --tf-violet-500: #c9771c;
+  --tf-violet-600: #a95f14;
+  --tf-violet-700: #864a12;
+  --tf-violet-800: #633710;
+  --tf-violet-900: #45270c;
+  --tf-violet-950: #281606;
+
+  --tf-gold-from: #e8c47e;
+  --tf-gold-to: #c9953c;
+  --tf-on-gold: #1a140e;
+  --tf-glow: rgba(184, 134, 47, 0.28);
+  --tf-hairline: rgba(140, 98, 32, 0.18);
 }
 
 :root {
-  font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;
+  font-family: var(--font-sans);
   line-height: 1.5;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+}
+
+/* Headings use the landing page's display face. In the base layer, so any
+   explicit font-* utility on a heading still wins. */
+@layer base {
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+  }
 }
 
 :root,
 [data-theme='dark'] {
   color-scheme: dark;
-  background-color: #020617;
-  color: #f1f5f9;
+  background-color: var(--tf-slate-950);
+  color: var(--tf-slate-100);
 }
 
 [data-theme='light'] {
@@ -185,17 +278,179 @@
 /* ---------- App-level helpers ---------- */
 
 .text-gradient {
-  background: linear-gradient(115deg, var(--tf-indigo-600) 0%, #8b5cf6 55%, #d946ef 120%);
+  background: linear-gradient(115deg, var(--tf-indigo-600) 0%, var(--tf-indigo-400) 50%, var(--tf-violet-500) 110%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
 
 [data-theme='dark'] .text-gradient {
-  background: linear-gradient(115deg, var(--tf-indigo-400) 0%, #a78bfa 55%, #e879f9 120%);
+  background: linear-gradient(115deg, var(--tf-indigo-200) 0%, var(--tf-indigo-400) 50%, var(--tf-violet-400) 110%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+}
+
+/* ---------- VARELO signature pieces ---------- */
+
+/*
+ * Gold fill for primary actions — the landing page's CTA, with a sheen that
+ * sweeps across on hover like light off polished metal. Text is always dark
+ * espresso: white on gold doesn't hold contrast.
+ */
+@utility btn-gold {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  color: var(--tf-on-gold);
+  background: linear-gradient(135deg, var(--tf-gold-from), var(--tf-gold-to));
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.35) inset,
+    0 6px 18px -8px var(--tf-glow);
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: linear-gradient(105deg, transparent 35%, rgba(255, 248, 230, 0.55) 50%, transparent 65%);
+    transform: translateX(-120%);
+    transition: transform 0.7s cubic-bezier(0.2, 0.75, 0.2, 1);
+  }
+
+  &:hover {
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.4) inset,
+      0 10px 26px -8px var(--tf-glow);
+  }
+
+  &:hover::after {
+    transform: translateX(120%);
+  }
+}
+
+/*
+ * Ambient backdrop for the app shell: two soft gold/amber glows drifting
+ * slowly behind the content, over a faint blueprint grid — a quiet nod to
+ * the 3D station on the landing page. Purely decorative; fixed and
+ * non-interactive.
+ */
+/* z-index -1 inside the shell's `isolate` root: above the page background,
+   below all content — without giving the content its own stacking context,
+   which would trap page dialogs under the sidebar. */
+.app-ambient {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.app-ambient::before,
+.app-ambient::after {
+  content: '';
+  position: absolute;
+  width: 55vmax;
+  height: 55vmax;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.5;
+}
+
+.app-ambient::before {
+  top: -22vmax;
+  right: -14vmax;
+  background: radial-gradient(circle, color-mix(in srgb, var(--tf-indigo-400) 38%, transparent), transparent 65%);
+  animation: tf-drift-a 26s ease-in-out infinite alternate;
+}
+
+.app-ambient::after {
+  bottom: -26vmax;
+  left: -18vmax;
+  background: radial-gradient(circle, color-mix(in srgb, var(--tf-violet-400) 26%, transparent), transparent 65%);
+  animation: tf-drift-b 32s ease-in-out infinite alternate;
+}
+
+[data-theme='light'] .app-ambient::before,
+[data-theme='light'] .app-ambient::after {
+  opacity: 0.35;
+}
+
+.app-ambient-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(var(--tf-hairline) 1px, transparent 1px),
+    linear-gradient(90deg, var(--tf-hairline) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(ellipse 70% 55% at 50% 0%, #000 20%, transparent 75%);
+  opacity: 0.55;
+}
+
+@keyframes tf-drift-a {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(-8vmax, 6vmax, 0) scale(1.12);
+  }
+}
+
+@keyframes tf-drift-b {
+  from {
+    transform: translate3d(0, 0, 0) scale(1.05);
+  }
+  to {
+    transform: translate3d(9vmax, -5vmax, 0) scale(0.95);
+  }
+}
+
+/*
+ * The landing page's laser, reused: a thin gold beam that sweeps once along
+ * the bottom edge of the top bar each time the route changes (the element is
+ * re-keyed on pathname, which restarts the animation).
+ */
+.header-beam {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 1px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.header-beam::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, var(--tf-indigo-400), #fff8e6, var(--tf-violet-400), transparent);
+  box-shadow: 0 0 12px var(--tf-glow);
+  animation: tf-beam 1.4s cubic-bezier(0.65, 0, 0.35, 1) both;
+}
+
+@keyframes tf-beam {
+  from {
+    transform: translateX(-100%);
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  to {
+    transform: translateX(260%);
+    opacity: 0;
+  }
+}
+
+/* Gold hairline + glow on hoverable cards, matching the landing panels. */
+.card-glow:hover {
+  border-color: color-mix(in srgb, var(--tf-indigo-400) 55%, transparent);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--tf-indigo-400) 22%, transparent),
+    0 18px 40px -22px var(--tf-glow);
 }
 
 .bg-page {
@@ -212,12 +467,12 @@
   background-size: 22px 22px;
 }
 
-/* Skeleton shimmer surface */
+/* Skeleton shimmer surface — a warm gold sheen passing over espresso/sand. */
 .shimmer-bg {
   background: linear-gradient(
     110deg,
     var(--tf-slate-100) 8%,
-    var(--tf-slate-200) 18%,
+    color-mix(in srgb, var(--tf-indigo-200) 45%, var(--tf-slate-100)) 18%,
     var(--tf-slate-100) 33%
   );
   background-size: 200% 100%;
@@ -225,7 +480,12 @@
 }
 
 [data-theme='dark'] .shimmer-bg {
-  background: linear-gradient(110deg, #1e293b 8%, #273449 18%, #1e293b 33%);
+  background: linear-gradient(
+    110deg,
+    var(--tf-slate-800) 8%,
+    color-mix(in srgb, var(--tf-indigo-400) 16%, var(--tf-slate-800)) 18%,
+    var(--tf-slate-800) 33%
+  );
   background-size: 200% 100%;
   animation: tf-shimmer 1.6s linear infinite;
 }
@@ -244,7 +504,24 @@
   background: var(--tf-slate-300);
 }
 [data-theme='dark'] .tf-scroll::-webkit-scrollbar-thumb {
-  background: #334155;
+  background: var(--tf-slate-700);
+}
+
+/* Every decorative motion in the app shell switches off for visitors who ask
+   for reduced motion. (The landing page manages its own animations.) */
+@media (prefers-reduced-motion: reduce) {
+  .app-ambient::before,
+  .app-ambient::after,
+  .header-beam::before,
+  .shimmer-bg,
+  .animate-page-in,
+  .animate-float,
+  .animate-spin-slow {
+    animation: none !important;
+  }
+  .btn-gold::after {
+    display: none;
+  }
 }
 
 /* Hide number input spinners */

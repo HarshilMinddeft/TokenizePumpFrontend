@@ -32,7 +32,7 @@ const ConnectPill = ({ onClick }) => (
   <button
     type="button"
     onClick={onClick}
-    className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 px-3.5 text-[13px] font-semibold text-white shadow-sm shadow-indigo-600/30 transition-all duration-150 hover:shadow-md hover:shadow-indigo-600/40 hover:brightness-110 active:scale-[0.98]"
+    className="btn-gold inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg px-3.5 text-[13px] font-semibold transition-all duration-150 active:scale-[0.98]"
   >
     <WalletIcon />
     <span className="hidden sm:inline">Connect wallet</span>
@@ -129,7 +129,7 @@ const ConnectedPill = ({ address, onDisconnect }) => {
         className="group inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white py-0 pr-2 pl-1.5 shadow-sm transition-all duration-150 hover:border-slate-300 active:scale-[0.98] dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-600"
         title="Manage wallet"
       >
-        <span className="flex h-6 w-6 items-center justify-center rounded-md bg-gradient-to-br from-indigo-500 to-violet-600 text-[10px] font-bold text-white">
+        <span className="btn-gold flex h-6 w-6 items-center justify-center rounded-md font-mono text-[10px] font-semibold">
           {address.slice(2, 4).toUpperCase()}
         </span>
         <span className="hidden items-center gap-1.5 text-[13px] font-semibold text-slate-700 sm:flex dark:text-slate-200">
@@ -203,7 +203,8 @@ const TopBar = ({ onMenuOpen }) => {
   const meta = getPageMeta(location.pathname);
 
   return (
-    <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/80 backdrop-blur-xl dark:border-slate-800/80 dark:bg-slate-950/70">
+    <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/75 backdrop-blur-xl dark:border-[color:var(--tf-hairline)] dark:bg-slate-950/70">
+      <span key={location.pathname} className="header-beam" aria-hidden="true" />
       <div className="mx-auto flex h-16 w-full max-w-[1180px] items-center gap-3 px-4 sm:px-6 lg:px-8">
         <button
           type="button"
@@ -221,7 +222,7 @@ const TopBar = ({ onMenuOpen }) => {
         </button>
 
         <div className="hidden items-center gap-1.5 text-sm lg:flex">
-          <span className="text-slate-400 dark:text-slate-500">TrueFraction</span>
+          <span className="font-display font-bold tracking-[0.06em] text-slate-400 dark:text-slate-500">VARELO</span>
           <svg className="h-3.5 w-3.5 text-slate-300 dark:text-slate-600" viewBox="0 0 20 20" fill="currentColor">
             <path
               fillRule="evenodd"

@@ -5,17 +5,7 @@ import { cn } from '../../lib/utils';
 import { NAV_GROUPS } from '../../config/navigation';
 import useAuthorityRole from '../../features/property/hooks/useAuthorityRole';
 import useHasActiveBuyBack from '../../features/property/hooks/useHasActiveBuyBack';
-
-const Logo = () => (
-  <div className="flex items-center gap-2.5">
-    <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 p-1 ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-slate-700">
-      <img src="/logoD.webp" className="h-7 w-7 object-contain" alt="TrueFraction logo" />
-    </span>
-    <span className="text-[17px] font-bold tracking-tight text-slate-900 dark:text-white">
-      True<span className="text-gradient">Fraction</span>
-    </span>
-  </div>
-);
+import BrandLogo from './BrandLogo';
 
 const NavItem = ({ item, isActive, onClick }) => (
   <li>
@@ -23,18 +13,22 @@ const NavItem = ({ item, isActive, onClick }) => (
       type="button"
       onClick={onClick}
       className={cn(
-        'group flex w-full cursor-pointer items-center gap-3 rounded-xl px-3 py-2 text-left transition-all duration-150',
+        'group relative flex w-full cursor-pointer items-center gap-3 rounded-xl px-3 py-2 text-left transition-all duration-200',
         isActive
-          ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-600/25'
-          : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800/70 dark:hover:text-white',
+          ? 'bg-indigo-500/10 text-indigo-700 ring-1 ring-indigo-500/25 dark:bg-indigo-400/10 dark:text-indigo-200 dark:ring-indigo-400/20'
+          : 'text-slate-600 hover:translate-x-0.5 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800/70 dark:hover:text-white',
       )}
     >
+      {/* Glowing gold edge on the active item, like the landing timeline. */}
+      {isActive && (
+        <span className="absolute top-2 bottom-2 -left-3 w-[3px] rounded-r-full bg-indigo-400 shadow-[0_0_10px_var(--tf-glow),0_0_2px_var(--tf-indigo-400)]" />
+      )}
       <span
         className={cn(
           'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors',
           isActive
-            ? 'bg-white/15 text-white'
-            : 'text-slate-400 group-hover:text-indigo-600 dark:text-slate-500 dark:group-hover:text-indigo-400',
+            ? 'btn-gold'
+            : 'text-slate-400 group-hover:text-indigo-600 dark:text-slate-500 dark:group-hover:text-indigo-300',
         )}
       >
         <svg className="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
@@ -43,7 +37,10 @@ const NavItem = ({ item, isActive, onClick }) => (
       </span>
       <span className="min-w-0 flex-1 text-[13.5px] font-medium">{item.label}</span>
       {isActive && (
-        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-white shadow-[0_0_6px_rgba(255,255,255,0.9)]" />
+        <span className="relative flex h-1.5 w-1.5 shrink-0">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-indigo-400 opacity-60" />
+          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-indigo-400" />
+        </span>
       )}
     </button>
   </li>
@@ -79,13 +76,13 @@ const Sidebar = ({ open = false, onClose }) => {
 
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-slate-200 bg-white transition-transform duration-200 ease-out dark:border-slate-800 dark:bg-slate-900',
+          'fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-slate-200 bg-white/85 backdrop-blur-xl transition-transform duration-200 ease-out dark:border-[color:var(--tf-hairline)] dark:bg-slate-900/85',
           open ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
         )}
       >
         <div className="flex items-center justify-between px-5 pt-5 pb-2">
           <a href="/" onClick={() => onClose?.()}>
-            <Logo />
+            <BrandLogo />
           </a>
           <button
             type="button"
@@ -106,7 +103,7 @@ const Sidebar = ({ open = false, onClose }) => {
 
             return (
               <div key={group.id}>
-                <p className="mb-2 px-3 text-[10.5px] font-bold tracking-[0.12em] text-slate-400 uppercase dark:text-slate-500">
+                <p className="mb-2 px-3 font-mono text-[10.5px] font-medium tracking-[0.16em] text-indigo-600/80 uppercase dark:text-indigo-300/70">
                   {group.label}
                 </p>
                 <ul className="space-y-1">

@@ -6,19 +6,26 @@ const PageHeader = ({ title, description, icon, eyebrow, action, actions, classN
     <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div className="flex min-w-0 items-start gap-4 text-left">
         {icon && (
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-600/25 ring-1 ring-white/20 ring-inset dark:from-indigo-500 dark:to-violet-500">
-            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.7}>
-              {icon}
-            </svg>
+          <div className="relative h-12 w-12 shrink-0">
+            {/* Dashed orbit turning slowly around the icon — the landing page's vault ring. */}
+            <span
+              aria-hidden="true"
+              className="animate-spin-slow absolute -inset-1.5 rounded-[20px] border border-dashed border-indigo-400/50"
+            />
+            <div className="btn-gold relative flex h-12 w-12 items-center justify-center rounded-2xl">
+              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.7}>
+                {icon}
+              </svg>
+            </div>
           </div>
         )}
         <div className="min-w-0">
           {eyebrow && (
-            <p className="mb-1 text-[11px] font-bold tracking-[0.14em] text-indigo-600 uppercase dark:text-indigo-400">
+            <p className="mb-1.5 font-mono text-[11px] font-medium tracking-[0.16em] text-indigo-600 uppercase dark:text-indigo-300">
               {eyebrow}
             </p>
           )}
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-[28px] dark:text-white">
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-[30px] dark:text-white">
             {title}
           </h1>
           {description && (

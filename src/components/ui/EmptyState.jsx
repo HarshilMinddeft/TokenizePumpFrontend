@@ -15,9 +15,9 @@ const EmptyState = ({
       className,
     )}
   >
-    <div className="relative mb-5">
-      <div className="absolute -inset-3 rounded-full bg-indigo-500/15 blur-xl" />
-      <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-50 to-violet-100 text-indigo-500 ring-1 ring-indigo-100 dark:from-indigo-500/20 dark:to-violet-500/10 dark:text-indigo-300 dark:ring-indigo-500/20">
+    <div className="animate-float relative mb-5">
+      <div className="absolute -inset-3 animate-pulse rounded-full bg-indigo-500/15 blur-xl" />
+      <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-50 to-violet-100 text-indigo-600 ring-1 ring-indigo-100 dark:from-indigo-500/20 dark:to-violet-500/10 dark:text-indigo-300 dark:ring-indigo-500/20">
         {icon || (
           <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
             <path

@@ -151,7 +151,7 @@ const FLOW_STEPS = [
   { title: 'Deploy compliance contract', detail: 'Security wrapper for the asset' },
   { title: 'Ownership hand-over', detail: 'Compliance moved to the property owner' },
   { title: 'Mint property NFT', detail: 'One NFT per real-world asset' },
-  { title: 'Register with TrueFraction', detail: 'Gallery, metadata & documents published' },
+  { title: 'Register with VARELO', detail: 'Gallery, metadata & documents published' },
 ];
 
 /* ------------------------------------------------------------------ */
@@ -699,12 +699,12 @@ const TokenizePropertyPage = () => {
                       <span
                         className={`relative z-10 mt-0.5 flex h-[23px] w-[23px] shrink-0 items-center justify-center rounded-full text-[10px] font-bold ring-4 ring-white dark:ring-slate-900 ${
                           done || running
-                            ? 'bg-indigo-600 text-white'
+                            ? 'bg-indigo-400 text-[#1a140e]'
                             : 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500'
                         }`}
                       >
                         {running ? (
-                          <span className="h-2.5 w-2.5 animate-spin rounded-full border-[1.5px] border-white/40 border-t-white" />
+                          <span className="h-2.5 w-2.5 animate-spin rounded-full border-[1.5px] border-current/30 border-t-current" />
                         ) : done ? (
                           '✓'
                         ) : (

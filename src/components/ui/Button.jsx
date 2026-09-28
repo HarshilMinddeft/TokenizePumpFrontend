@@ -8,8 +8,9 @@ const SIZES = {
 };
 
 const VARIANTS = {
-  primary:
-    'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-sm shadow-indigo-600/30 hover:shadow-md hover:shadow-indigo-600/40 hover:brightness-110 dark:from-indigo-500 dark:to-violet-500',
+  // Gold with dark text + hover sheen, as on the landing page CTAs (see
+  // `btn-gold` in src/app/index.css).
+  primary: 'btn-gold',
   secondary:
     'border border-slate-200 bg-white text-slate-700 shadow-sm hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800',
   ghost:
