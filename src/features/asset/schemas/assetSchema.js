@@ -3,9 +3,9 @@ import { z } from 'zod';
 import { evenlyDividingTiers, PRICE_STEP } from '../../../utils/units';
 
 /**
- * Property Size / Price are collected as free text (e.g. "4151 Sqft",
+ * Asset Size / Price are collected as free text (e.g. "4151 Sqft",
  * "$450,000") because that's how the data is naturally written, but
- * `PropertyNFT.mintProperty` needs a plain positive uint256 for each.
+ * `AssetNFT.mintAsset` needs a plain positive uint256 for each.
  * Extracts the leading number so both the validator and the mint call
  * agree on what the field means.
  */
@@ -25,20 +25,20 @@ const walletAddress = (fieldLabel) =>
   requiredText(fieldLabel).refine((value) => ethers.utils.isAddress(value), 'Enter a valid wallet address.');
 
 /**
- * Validates the Tokenize Property form fields before any upload or
+ * Validates the Tokenize Asset form fields before any upload or
  * on-chain call is made. `singleImage` gates the mint step in
- * TokenizePropertyPage, so it's required here too — submitting without it
+ * TokenizeAssetPage, so it's required here too — submitting without it
  * would otherwise silently skip minting while still saving a listing.
  */
-export const tokenizePropertySchema = z.object({
-  name: requiredText('Property Name'),
-  // FractionalVault.fractionalizeProperty mints propertyPrice / basePrice
+export const tokenizeAssetSchema = z.object({
+  name: requiredText('Asset Name'),
+  // FractionalVault.fractionalizeAsset mints assetPrice / basePrice
   // shares with no remainder allowed (SHARE_DECIMALS == 0), and basePrice
   // is only ever offered in $10 steps at fractionalize time — so a price
   // with no evenly-dividing $10 tier can never be fractionalized later.
-  // Caught here, at entry, rather than letting the property mint as a dead
+  // Caught here, at entry, rather than letting the asset mint as a dead
   // end that has to be fixed after the fact.
-  propertyPrice: numericText('Property Price').superRefine((value, ctx) => {
+  assetPrice: numericText('Asset Price').superRefine((value, ctx) => {
     const price = parseLeadingNumber(value);
     if (Number.isNaN(price) || price <= 0) return; // already reported by numericText's own refinements
     if (evenlyDividingTiers(price).length === 0) {
@@ -48,14 +48,14 @@ export const tokenizePropertySchema = z.object({
       });
     }
   }),
-  propertySize: numericText('Property Size'),
-  propertyOwnerWallet: walletAddress('Property Owner Wallet'),
+  assetSize: numericText('Asset Size'),
+  assetOwnerWallet: walletAddress('Asset Owner Wallet'),
   features: requiredText('Features'),
   offering: requiredText('Offering'),
   details: requiredText('Details'),
   management: requiredText('Managed By'),
   location: requiredText('Location'),
   singleImage: z
-    .instanceof(File, { message: 'Upload a primary property image.' })
-    .refine((file) => file.size > 0, 'Upload a primary property image.'),
+    .instanceof(File, { message: 'Upload a primary asset image.' })
+    .refine((file) => file.size > 0, 'Upload a primary asset image.'),
 });

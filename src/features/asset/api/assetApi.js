@@ -10,27 +10,27 @@ const api = axios.create({
 
 /**
  * Every read endpoint wraps its payload as { success, message, data }.
- * Callers want the payload itself (e.g. { properties: [...] }), so unwrap
+ * Callers want the payload itself (e.g. { assets: [...] }), so unwrap
  * it here once rather than in each page.
  */
 const unwrap = (response) => response.data?.data ?? response.data;
 
-export const propertyApi = {
-  // Fetch properties owned by address
-  getOwnerProperties: async (ownerAddress) => {
-    const response = await api.get(`/properties/getOwnerProperty?ownerAddress=${ownerAddress}`);
+export const assetApi = {
+  // Fetch assets owned by address
+  getOwnerAssets: async (ownerAddress) => {
+    const response = await api.get(`/assets/getOwnerAsset?ownerAddress=${ownerAddress}`);
     return unwrap(response);
   },
 
-  // Fetch all marketplace properties summary
-  getAllMarketplaceProperties: async () => {
-    const response = await api.get(`/properties/marketPlace/getAllPropertiesSummary`);
+  // Fetch all marketplace assets summary
+  getAllMarketplaceAssets: async () => {
+    const response = await api.get(`/assets/marketPlace/getAllAssetsSummary`);
     return unwrap(response);
   },
 
-  // Fetch single property details by ID
-  getPropertyById: async (propertyId) => {
-    const response = await api.get(`/properties/marketPlace/getPropertyById/${propertyId}`);
+  // Fetch single asset details by ID
+  getAssetById: async (assetId) => {
+    const response = await api.get(`/assets/marketPlace/getAssetById/${assetId}`);
     return unwrap(response);
   },
 
@@ -53,7 +53,7 @@ export const propertyApi = {
 
   // Upload NFT file to IPFS via backend
   uploadNftImage: async (formData) => {
-    const response = await axios.post(`${envConfig.apiBaseUrl}/api/properties/nftUpload`, formData, {
+    const response = await axios.post(`${envConfig.apiBaseUrl}/api/assets/nftUpload`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     return unwrap(response);
@@ -61,15 +61,15 @@ export const propertyApi = {
 
   // Upload metadata JSON to IPFS via backend
   uploadMetadata: async (metadataJSON) => {
-    const response = await api.post(`/properties/metadataUpload`, metadataJSON);
+    const response = await api.post(`/assets/metadataUpload`, metadataJSON);
     return unwrap(response);
   },
 
-  // Store property entry in backend DB
-  addProperty: async (propertyPayload) => {
-    const response = await api.post(`/properties/addProperty`, propertyPayload);
+  // Store asset entry in backend DB
+  addAsset: async (assetPayload) => {
+    const response = await api.post(`/assets/addAsset`, assetPayload);
     return response.data;
   },
 };
 
-export default propertyApi;
+export default assetApi;

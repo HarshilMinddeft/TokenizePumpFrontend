@@ -7,7 +7,7 @@ import { getPageMeta } from '../../config/navigation';
 
 /**
  * Shell for pages that stay public regardless of wallet connection —
- * currently Marketplace and Property details. No Sidebar here, ever: these
+ * currently Marketplace and Asset details. No Sidebar here, ever: these
  * two pages are meant for normal visitors browsing without a wallet, so the
  * authenticated app-shell (Fractionalize, List, Tokenize, etc.) never shows
  * here even once a wallet connects. Everything else still goes through

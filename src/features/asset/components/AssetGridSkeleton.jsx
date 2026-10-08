@@ -1,6 +1,6 @@
 import Skeleton from '../../../components/ui/Skeleton';
 
-const PropertyGridSkeleton = ({ count = 6 }) => (
+const AssetGridSkeleton = ({ count = 6 }) => (
   <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
     {Array.from({ length: count }).map((_, i) => (
       <div
@@ -22,4 +22,4 @@ const PropertyGridSkeleton = ({ count = 6 }) => (
   </div>
 );
 
-export default PropertyGridSkeleton;
+export default AssetGridSkeleton;

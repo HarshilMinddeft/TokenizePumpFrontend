@@ -3,13 +3,13 @@ import { toast } from 'react-toastify';
 import FlipClockCountdown from '@leenguyen/react-flip-clock-countdown';
 import '@leenguyen/react-flip-clock-countdown/dist/index.css';
 import AppLayout from '../../../components/layout/AppLayout';
-import PropertyCard from '../components/PropertyCard';
+import AssetCard from '../components/AssetCard';
 import PageHeader from '../../../components/ui/PageHeader';
 import Button from '../../../components/ui/Button';
 import Spinner from '../../../components/ui/Spinner';
 import EmptyState from '../../../components/ui/EmptyState';
 import web3Service from '../../../services/web3Service';
-import propertyApi from '../api/propertyApi';
+import assetApi from '../api/assetApi';
 import { useWeb3 } from '../../../context/Web3Context';
 import { useTheme } from '../../../context/ThemeContext';
 import { getContractErrorMessage } from '../../../utils/web3Errors';
@@ -122,23 +122,23 @@ const WithdrawBuyBackPage = () => {
 
     setLoading(true);
     try {
-      const data = await propertyApi.getAllMarketplaceProperties();
-      const allProps = data.properties || [];
+      const data = await assetApi.getAllMarketplaceAssets();
+      const allProps = data.assets || [];
       const marketplace = web3Service.getReadOnlyMarketplaceContract();
 
       const owned = [];
       for (const prop of allProps) {
         try {
-          const listing = await marketplace.listings(prop.propertyId);
+          const listing = await marketplace.listings(prop.assetId);
           if (listing.owner.toLowerCase() !== address.toLowerCase()) continue;
           if (!listing.buyBack) continue;
 
-          const outstanding = await marketplace.outstandingTokens(prop.propertyId);
+          const outstanding = await marketplace.outstandingTokens(prop.assetId);
 
           owned.push({
-            property: prop,
+            asset: prop,
             listing: {
-              tokenId: prop.propertyId,
+              tokenId: prop.assetId,
               totalTokens: formatShares(listing.totalTokens),
               // The marketplace's own outstandingTokens(tokenId) view — the
               // exact shares sold out of this listing and still held by
@@ -151,7 +151,7 @@ const WithdrawBuyBackPage = () => {
             },
           });
         } catch (err) {
-          console.error(`Error reading listing ${prop.propertyId}:`, err);
+          console.error(`Error reading listing ${prop.assetId}:`, err);
         }
       }
       setRows(owned);
@@ -199,20 +199,20 @@ const WithdrawBuyBackPage = () => {
         <Spinner words={['listings', 'escrow', 'deadlines', 'listings']} />
       ) : !address ? (
         <EmptyState title="Wallet not connected">
-          Connect your wallet to view and withdraw buyback escrow for properties you have listed.
+          Connect your wallet to view and withdraw buyback escrow for assets you have listed.
         </EmptyState>
       ) : rows.length > 0 ? (
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {rows.map(({ property, listing }) => (
-            <PropertyCard key={listing.tokenId} property={property}>
+          {rows.map(({ asset, listing }) => (
+            <AssetCard key={listing.tokenId} asset={asset}>
               <WithdrawCard listing={listing} onWithdraw={() => withdrawDeposit(listing.tokenId)} />
-            </PropertyCard>
+            </AssetCard>
           ))}
         </div>
       ) : (
         <EmptyState title="No active buybacks">
-          You have no properties with a live buyback. Activate one from the Cancel Listing page when you delist a
-          property with outstanding shares.
+          You have no assets with a live buyback. Activate one from the Cancel Listing page when you delist a
+          asset with outstanding shares.
         </EmptyState>
       )}
     </AppLayout>

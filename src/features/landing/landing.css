@@ -15,7 +15,7 @@
  * Tailwind v4's `@theme` is inherently global — there is no per-route
  * scoping mechanism. The rest of the app already registers its own
  * `@theme inline` (src/app/index.css) for the slate/indigo palette used by
- * the Web3/marketplace/property pages. This page's palette (espresso/gold/
+ * the Web3/marketplace/asset pages. This page's palette (espresso/gold/
  * sand, always-dark) is a different visual system entirely, so every token
  * here is namespaced under `station-*` (e.g. `--color-station-gold` ->
  * `text-station-gold`, `bg-station-panel`). That keeps the generated

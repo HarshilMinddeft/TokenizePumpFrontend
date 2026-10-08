@@ -14,7 +14,7 @@ import Badge from '../../../components/ui/Badge';
 import Dialog from '../../../components/ui/Dialog';
 import CopyButton from '../../../components/ui/CopyButton';
 import web3Service from '../../../services/web3Service';
-import propertyApi from '../api/propertyApi';
+import assetApi from '../api/assetApi';
 import contractsConfig from '../../../config/contracts.config';
 import { ROUTES } from '../../../config/routes';
 import { useWeb3 } from '../../../context/Web3Context';
@@ -165,7 +165,7 @@ const Gallery = ({ images = [] }) => {
   if (!images?.length) {
     return (
       <Card className="flex aspect-[16/9] items-center justify-center text-slate-400 dark:text-slate-600">
-        No images available for this property
+        No images available for this asset
       </Card>
     );
   }
@@ -179,7 +179,7 @@ const Gallery = ({ images = [] }) => {
           <motion.img
             key={active}
             src={images[active]}
-            alt={`Property view ${active + 1}`}
+            alt={`Asset view ${active + 1}`}
             initial={{ opacity: 0.4, scale: 1.02 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0 }}
@@ -264,13 +264,13 @@ const StatusBanner = ({ buyBack, buyBackPrice }) =>
 /* Page                                                                 */
 /* ------------------------------------------------------------------ */
 
-const PropertyDetailPage = ({ isPublic = false }) => {
+const AssetDetailPage = ({ isPublic = false }) => {
   const Layout = isPublic ? PublicLayout : AppLayout;
   const { id } = useParams();
   const navigate = useNavigate();
   const { address: currentSigner } = useWeb3();
 
-  const [property, setProperty] = useState(null);
+  const [asset, setAsset] = useState(null);
   const [buyTokensAmount, setBuyTokensAmount] = useState('');
   const [orderSellAmount, setOrderSellAmount] = useState('');
   const [opricePerToken, setPricePerToken] = useState('');
@@ -356,13 +356,13 @@ const PropertyDetailPage = ({ isPublic = false }) => {
         // flow directly once the widget itself reports success. addNewUser
         // must run first: the webhook handler looks the user up by refId
         // and does nothing if that row doesn't exist yet.
-        await propertyApi.addNewUser({
+        await assetApi.addNewUser({
           refId: confirmedRefId,
           userWalletAddress: currentSigner,
           kycActive: false,
         });
         toast.info('Verifying your identity on-chain — this can take a moment…');
-        await propertyApi.triggerKycWebhook(confirmedRefId);
+        await assetApi.triggerKycWebhook(confirmedRefId);
         await checkKyc();
         toast.success('Identity verified successfully!');
         setShowPopup(false);
@@ -392,15 +392,15 @@ const PropertyDetailPage = ({ isPublic = false }) => {
 
   const fetchDetails = async () => {
     try {
-      const data = await propertyApi.getPropertyById(id);
-      if (data && data.property) {
-        setProperty(data.property);
+      const data = await assetApi.getAssetById(id);
+      if (data && data.asset) {
+        setAsset(data.asset);
       }
 
       const marketplaceContract = web3Service.getReadOnlyMarketplaceContract();
       const checkListing = await marketplaceContract.listings(id);
       const listingData = {
-        shareToken: checkListing.propertyToken,
+        shareToken: checkListing.assetToken,
         totalShares: formatShares(checkListing.totalTokens),
         pricePerToken: formatStable(checkListing.pricePerToken),
         remainingTokens: formatShares(checkListing.remainingTokens),
@@ -409,12 +409,12 @@ const PropertyDetailPage = ({ isPublic = false }) => {
       };
       setContractListingData(listingData);
     } catch (err) {
-      console.error('Error fetching property details:', err);
+      console.error('Error fetching asset details:', err);
     }
   };
 
   /**
-   * Connected wallet's USDC and share-token balances for this property, so
+   * Connected wallet's USDC and share-token balances for this asset, so
    * the buy/sell cards can show what the user actually holds rather than
    * making them check a wallet extension separately.
    */
@@ -490,7 +490,7 @@ const PropertyDetailPage = ({ isPublic = false }) => {
     return totalPrice.mul(saleFeeRate.bps).div(saleFeeRate.denominator);
   };
 
-  const buyPropertyTokens = async () => {
+  const buyAssetTokens = async () => {
     if (!buyTokensAmount || Number(buyTokensAmount) <= 0) {
       toast.error('Please enter the number of tokens to buy.');
       return;
@@ -521,7 +521,7 @@ const PropertyDetailPage = ({ isPublic = false }) => {
       fetchDetails();
       fetchWalletBalances(contractListingData.shareToken);
     } catch (error) {
-      console.error('Error buying property tokens:', error);
+      console.error('Error buying asset tokens:', error);
       toast.error(getContractErrorMessage(error));
     }
   };
@@ -530,7 +530,7 @@ const PropertyDetailPage = ({ isPublic = false }) => {
     try {
       const marketplaceContract = web3Service.getReadOnlyMarketplaceContract();
       const checkListing = await marketplaceContract.listings(id);
-      const addressCheck = checkListing.propertyToken;
+      const addressCheck = checkListing.assetToken;
 
       const orderBookContract = web3Service.getReadOnlyOrderBookContract();
       const nextOrderId = await orderBookContract.nextOrderId();
@@ -594,9 +594,9 @@ const PropertyDetailPage = ({ isPublic = false }) => {
       const formBuyAmount = parseShares(orderSellAmount);
       const formOrderTokenAmount = parseStable(opricePerToken);
 
-      const propertyTokenContract = await web3Service.getShareTokenContract(contractListingData.shareToken);
+      const assetTokenContract = await web3Service.getShareTokenContract(contractListingData.shareToken);
 
-      const approveTx = await propertyTokenContract.approve(contractsConfig.orderBook.address, formBuyAmount);
+      const approveTx = await assetTokenContract.approve(contractsConfig.orderBook.address, formBuyAmount);
       await approveTx.wait();
 
       const orderBookContract = await web3Service.getOrderBookContract();
@@ -679,7 +679,7 @@ const PropertyDetailPage = ({ isPublic = false }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  // Fee rate is a marketplace-wide setting, not per-property — fetch once.
+  // Fee rate is a marketplace-wide setting, not per-asset — fetch once.
   useEffect(() => {
     fetchSaleFeeRate();
   }, []);
@@ -714,11 +714,11 @@ const PropertyDetailPage = ({ isPublic = false }) => {
   }, [currentSigner]);
 
   const isOwner = useMemo(
-    () => property?.propertyOwnerWallet?.toLowerCase() === currentSigner.toLowerCase(),
-    [property, currentSigner],
+    () => asset?.assetOwnerWallet?.toLowerCase() === currentSigner.toLowerCase(),
+    [asset, currentSigner],
   );
 
-  if (!property) {
+  if (!asset) {
     return (
       <Layout>
         <Spinner words={['details', 'images', 'pricing', 'listings']} />
@@ -770,7 +770,7 @@ const PropertyDetailPage = ({ isPublic = false }) => {
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             <h1 className="truncate text-xl font-bold tracking-tight text-slate-900 sm:text-2xl dark:text-white">
-              {property.propertyName}
+              {asset.assetName}
             </h1>
             {listing.buyBack ? (
               <Badge tone="danger" dot>
@@ -783,16 +783,16 @@ const PropertyDetailPage = ({ isPublic = false }) => {
             )}
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-500 dark:text-slate-400">
-            {property.locationDetailes && (
+            {asset.locationDetails && (
               <span className="flex items-center gap-1.5">
                 <svg className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.9}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
                 </svg>
-                {property.locationDetailes}
+                {asset.locationDetails}
               </span>
             )}
-            <span className="font-mono text-xs text-slate-400 dark:text-slate-500">Property ID #{property.propertyId}</span>
+            <span className="font-mono text-xs text-slate-400 dark:text-slate-500">Asset ID #{asset.assetId}</span>
           </div>
         </div>
       </div>
@@ -804,15 +804,15 @@ const PropertyDetailPage = ({ isPublic = false }) => {
       <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
         {/* ---------------- LEFT COLUMN ---------------- */}
         <div className="space-y-6 lg:col-span-2">
-          <Gallery images={property.propertyImages} />
+          <Gallery images={asset.assetImages} />
 
           {/* Key facts */}
           <Card className="p-5 sm:p-6">
-            <SectionLabel>Property overview</SectionLabel>
+            <SectionLabel>Asset overview</SectionLabel>
             <div className="grid grid-cols-1 items-stretch gap-3 sm:grid-cols-2">
-              <FactItem icon="id" label="Property ID" value={`#${property.propertyId}`} />
-              <FactItem icon="size" label="Property size" value={property.propertySize ? `${formatNumber(property.propertySize)} sqft` : '—'} />
-              <FactItem icon="price" label="Underlying asset value" value={formatUsd(property.propertyPrice, 0)} />
+              <FactItem icon="id" label="Asset ID" value={`#${asset.assetId}`} />
+              <FactItem icon="size" label="Asset size" value={asset.assetSize ? `${formatNumber(asset.assetSize)} sqft` : '—'} />
+              <FactItem icon="price" label="Underlying asset value" value={formatUsd(asset.assetPrice, 0)} />
               <FactItem
                 icon="perToken"
                 label="Price per token"
@@ -835,9 +835,9 @@ const PropertyDetailPage = ({ isPublic = false }) => {
                     : '—'
                 }
               />
-              <FactItem icon="location" label="Location" value={property.locationDetailes || '—'} />
-              {property.propertyFeatures && (
-                <FactItem icon="features" label="Features" value={property.propertyFeatures} className="sm:col-span-2" />
+              <FactItem icon="location" label="Location" value={asset.locationDetails || '—'} />
+              {asset.assetFeatures && (
+                <FactItem icon="features" label="Features" value={asset.assetFeatures} className="sm:col-span-2" />
               )}
               {listing.shareToken && (
                 <FactItem
@@ -853,11 +853,11 @@ const PropertyDetailPage = ({ isPublic = false }) => {
           </Card>
 
           {/* Story / docs */}
-          {(property.offringDetailes || property.propertyDetailes || property.propertyManagement) && (
+          {(asset.offeringDetails || asset.assetDetails || asset.assetManagement) && (
             <Card className="p-5 sm:p-6">
               <SectionLabel>About this asset</SectionLabel>
               <div className="space-y-3">
-                {property.offringDetailes && (
+                {asset.offeringDetails && (
                   <Accordion
                     title="Offering details"
                     defaultOpen
@@ -865,36 +865,36 @@ const PropertyDetailPage = ({ isPublic = false }) => {
                       <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21" />
                     }
                   >
-                    {property.offringDetailes}
+                    {asset.offeringDetails}
                   </Accordion>
                 )}
-                {property.propertyDetailes && (
+                {asset.assetDetails && (
                   <Accordion
-                    title="Property details"
+                    title="Asset details"
                     icon={
                       <path strokeLinecap="round" strokeLinejoin="round" d="M9 6.75V15m6-6v8.25m.503 3.498 4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 0 0-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0Z" />
                     }
                   >
-                    {property.propertyDetailes}
+                    {asset.assetDetails}
                   </Accordion>
                 )}
-                {property.propertyManagement && (
+                {asset.assetManagement && (
                   <Accordion
                     title="Management details"
                     icon={
                       <path strokeLinecap="round" strokeLinejoin="round" d="M17.982 18.725A7.488 7.488 0 0 0 12 15.75a7.488 7.488 0 0 0-5.982 2.975m11.963 0a9 9 0 1 0-11.963 0m11.963 0A8.966 8.966 0 0 1 12 21a8.966 8.966 0 0 1-5.982-2.275M15 9.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
                     }
                   >
-                    {property.propertyManagement}
+                    {asset.assetManagement}
                   </Accordion>
                 )}
               </div>
             </Card>
           )}
 
-          {property.propertyDocuments && (
+          {asset.assetDocuments && (
             <a
-              href={property.propertyDocuments}
+              href={asset.assetDocuments}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-3 rounded-xl border border-dashed border-indigo-200 bg-indigo-50/40 px-4 py-3.5 text-sm font-semibold text-indigo-700 transition-colors hover:bg-indigo-100/60 dark:border-indigo-900 dark:bg-indigo-950/30 dark:text-indigo-300 dark:hover:bg-indigo-950/50"
@@ -990,7 +990,7 @@ const PropertyDetailPage = ({ isPublic = false }) => {
                 ) : (
                   <p className="rounded-lg bg-slate-50 px-3.5 py-2.5 text-xs text-slate-500 dark:bg-slate-950/60 dark:text-slate-400">
                     {currentSigner
-                      ? "You don't hold any tokens for this property, so there's nothing to sell back."
+                      ? "You don't hold any tokens for this asset, so there's nothing to sell back."
                       : 'Connect your wallet to sell tokens back.'}
                   </p>
                 )}
@@ -1092,7 +1092,7 @@ const PropertyDetailPage = ({ isPublic = false }) => {
                 )}
 
                 <KycGate>
-                  <Button fullWidth size="lg" onClick={buyPropertyTokens}>
+                  <Button fullWidth size="lg" onClick={buyAssetTokens}>
                     Purchase tokens
                   </Button>
                 </KycGate>
@@ -1241,4 +1241,4 @@ const PropertyDetailPage = ({ isPublic = false }) => {
   );
 };
 
-export default PropertyDetailPage;
+export default AssetDetailPage;

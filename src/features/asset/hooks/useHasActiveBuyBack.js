@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import web3Service from '../../../services/web3Service';
-import propertyApi from '../api/propertyApi';
+import assetApi from '../api/assetApi';
 
 /**
  * Whether the connected wallet owns at least one marketplace listing with a
@@ -27,13 +27,13 @@ export const useHasActiveBuyBack = (address) => {
 
       setChecking(true);
       try {
-        const data = await propertyApi.getAllMarketplaceProperties();
-        const allProps = data.properties || [];
+        const data = await assetApi.getAllMarketplaceAssets();
+        const allProps = data.assets || [];
         const marketplace = web3Service.getReadOnlyMarketplaceContract();
 
         let found = false;
         for (const prop of allProps) {
-          const listing = await marketplace.listings(prop.propertyId);
+          const listing = await marketplace.listings(prop.assetId);
           if (listing.owner.toLowerCase() === address.toLowerCase() && listing.buyBack) {
             found = true;
             break;

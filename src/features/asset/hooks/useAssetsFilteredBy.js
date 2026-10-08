@@ -1,25 +1,25 @@
 import { useCallback, useEffect, useState } from 'react';
 
 /**
- * Fetches properties via `fetchFn` then keeps only the ones for which
- * `include(property, contract)` resolves truthy. Mirrors the pattern
+ * Fetches assets via `fetchFn` then keeps only the ones for which
+ * `include(asset, contract)` resolves truthy. Mirrors the pattern
  * shared by Marketplace/Fractionalize/Redeem pages: pull the list from the
  * backend, then cross-check each entry against a read-only contract.
  *
- * @param {() => Promise<{properties: any[]}>} fetchFn
- * @param {(property: any, contract: import('ethers').Contract) => Promise<boolean>} include
+ * @param {() => Promise<{assets: any[]}>} fetchFn
+ * @param {(asset: any, contract: import('ethers').Contract) => Promise<boolean>} include
  * @param {() => import('ethers').Contract} getContract
  * @param {any[]} deps - re-fetch when these change (e.g. [address])
  */
-export const usePropertiesFilteredBy = (fetchFn, include, getContract, deps = []) => {
-  const [properties, setProperties] = useState([]);
+export const useAssetsFilteredBy = (fetchFn, include, getContract, deps = []) => {
+  const [assets, setAssets] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const refetch = useCallback(async () => {
     setLoading(true);
     try {
       const data = await fetchFn();
-      const allProps = data.properties || [];
+      const allProps = data.assets || [];
       const contract = getContract();
 
       const filtered = [];
@@ -29,12 +29,12 @@ export const usePropertiesFilteredBy = (fetchFn, include, getContract, deps = []
             filtered.push(prop);
           }
         } catch (err) {
-          console.error(`Error checking property ${prop.propertyId}:`, err);
+          console.error(`Error checking asset ${prop.assetId}:`, err);
         }
       }
-      setProperties(filtered);
+      setAssets(filtered);
     } catch (err) {
-      console.error('Error fetching properties:', err);
+      console.error('Error fetching assets:', err);
     } finally {
       setLoading(false);
     }
@@ -45,7 +45,7 @@ export const usePropertiesFilteredBy = (fetchFn, include, getContract, deps = []
     refetch();
   }, [refetch]);
 
-  return { properties, loading, refetch, setProperties };
+  return { assets, loading, refetch, setAssets };
 };
 
-export default usePropertiesFilteredBy;
+export default useAssetsFilteredBy;

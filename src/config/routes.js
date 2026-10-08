@@ -1,9 +1,9 @@
 export const ROUTES = {
   home: '/',
-  tokenizeProperty: '/tokenize-property',
-  fractionalizeProperty: '/fractionalize-property',
-  redeemProperty: '/redeem-property',
-  listProperty: '/list-property',
+  tokenizeAsset: '/tokenize-asset',
+  fractionalizeAsset: '/fractionalize-asset',
+  redeemAsset: '/redeem-asset',
+  listAsset: '/list-asset',
   withdrawBuyBack: '/withdraw-buyback',
   updatePrice: '/update-price',
   cancelListing: '/cancel-listing',
@@ -11,13 +11,13 @@ export const ROUTES = {
   // Public, no-sidebar marketplace for normal visitors who haven't
   // connected a wallet — this is what the landing page links to.
   marketplace: '/marketplace',
-  propertyDetails: '/properties/:id',
+  assetDetails: '/assets/:id',
   // Authenticated mirrors linked from the sidebar (full app shell). Any
   // connected wallet reaches these, not just admins — "app" just means
   // "inside the app", as opposed to the public marketing-site pages above.
   appMarketplace: '/app/marketplace',
-  appPropertyDetails: '/app/properties/:id',
+  appAssetDetails: '/app/assets/:id',
 };
 
-export const getPropertyDetailsPath = (propertyId) => `/properties/${propertyId}`;
-export const getAppPropertyDetailsPath = (propertyId) => `/app/properties/${propertyId}`;
+export const getAssetDetailsPath = (assetId) => `/assets/${assetId}`;
+export const getAppAssetDetailsPath = (assetId) => `/app/assets/${assetId}`;

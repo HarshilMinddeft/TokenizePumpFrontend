@@ -951,12 +951,12 @@ stage.setObject(station);
 const LIGHT_KEEP = new Set(); lights.forEach(([p, l]) => { if (p.name.startsWith('zone_fuel_canopy') || (p.name === 'zone_ev_charging' && !LIGHT_KEEP.has('ev'))) { if (p.name === 'zone_ev_charging') LIGHT_KEEP.add('ev'); p.add(l); } });
 // ---------- user car models (uncompressed GLB → merged per material, shared by every slot) ----------
 const CAR_MODELS = {
-  mclaren: { url: 'uploads/2017_mclaren_720s_zacoe_-_galaxy_carbon_fiber.glb', name: 'mclaren_720s', len: 4.54, yaw: 0 },
-  bugatti: { url: 'uploads/2020_bugatti_bolide_concept.glb', name: 'bugatti_bolide', len: 4.76, yaw: 0 },
-  jiotto: { url: 'uploads/jiotto_caspita_f1_road_car_1989_by_alex.ka..glb', name: 'jiotto_caspita', len: 4.43, yaw: 0 },
-  ferrari: { url: 'uploads/ferrari_ready.glb', name: 'ferrari', len: 4.6, yaw: 0 },
-  tesla: { url: 'uploads/tesla_ready.glb', name: 'tesla_roadster_2020', len: 4.2, yaw: 0 },
-  evcar: { url: 'uploads/EVCar_ready.glb', name: 'ev_car', len: 4.7, yaw: 0 },
+  mclaren: { url: 'models/2017_mclaren_720s_zacoe_-_galaxy_carbon_fiber.glb', name: 'mclaren_720s', len: 4.54, yaw: 0 },
+  bugatti: { url: 'models/2020_bugatti_bolide_concept.glb', name: 'bugatti_bolide', len: 4.76, yaw: 0 },
+  jiotto: { url: 'models/jiotto_caspita_f1_road_car_1989_by_alex.ka..glb', name: 'jiotto_caspita', len: 4.43, yaw: 0 },
+  ferrari: { url: 'models/ferrari_ready.glb', name: 'ferrari', len: 4.6, yaw: 0 },
+  tesla: { url: 'models/tesla_ready.glb', name: 'tesla_roadster_2020', len: 4.2, yaw: 0 },
+  evcar: { url: 'models/EVCar_ready.glb', name: 'ev_car', len: 4.7, yaw: 0 },
 };
 async function loadGLB(url) {
   const buf = await (await fetch(url)).arrayBuffer(), dv = new DataView(buf);
@@ -1096,7 +1096,7 @@ const carsReady = Promise.all(Object.keys(CAR_MODELS).map(async k => [k, await b
   }
   window.CARS_LOADED = carSlots.length;
 }).then(async () => {
-  const raw = await loadGLB('uploads/worker_apl.glb');
+  const raw = await loadGLB('models/worker_apl.glb');
   const b0 = new THREE.Box3().setFromObject(raw), sz = b0.getSize(new THREE.Vector3());
   const pivot = new THREE.Group(); pivot.add(raw);
   const k = 1.76 / sz.y; pivot.scale.setScalar(k); pivot.rotation.y = WORKER_YAW; pivot.updateMatrixWorld(true);
@@ -1130,7 +1130,7 @@ const carsReady = Promise.all(Object.keys(CAR_MODELS).map(async k => [k, await b
   workerSlots.forEach((w, i) => { const inst = lod.clone(); w.body = inst; w.g.add(inst); if (w.task !== 'still') { const sh = shadowBlob(); sh.scale.set(0.2, 1, 0.35); w.shadow = sh; w.g.add(sh); } addTool(w, i); });
   window.WORKERS_LOADED = workerSlots.length;
   {
-    const praw = await loadGLB('uploads/park_facility_asset.glb');
+    const praw = await loadGLB('models/park_facility_asset.glb');
     const pb0 = new THREE.Box3().setFromObject(praw), psz = pb0.getSize(new THREE.Vector3());
     const pp = new THREE.Group(); pp.name = 'park_facility'; pp.add(praw);
     if (psz.z > psz.x !== (PARK.d > PARK.w)) pp.rotation.y = PI / 2;

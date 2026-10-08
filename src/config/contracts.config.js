@@ -1,7 +1,7 @@
 import envConfig from './env.config';
 
 import MarketplaceArtifact from './abis/FractionalMarketplace.json';
-import PropertyNFTArtifact from './abis/PropertyNFT.json';
+import AssetNFTArtifact from './abis/AssetNFT.json';
 import TokenArtifact from './abis/Token.json';
 import OrderbookArtifact from './abis/Orderbook.json';
 import ModularComplianceArtifact from './abis/ModularCompliance.json';
@@ -18,14 +18,14 @@ export const contractsConfig = {
     address: envConfig.vaultAddress,
     abi: FractionalVaultArtifact.abi,
   },
-  // Per-property ERC-3643 share token; deployed by the vault, so the address
-  // is looked up per property rather than configured.
+  // Per-asset ERC-3643 share token; deployed by the vault, so the address
+  // is looked up per asset rather than configured.
   shareToken: {
     abi: TokenArtifact.abi,
   },
-  propertyNft: {
+  assetNft: {
     address: envConfig.nftContractAddress,
-    abi: PropertyNFTArtifact.abi,
+    abi: AssetNFTArtifact.abi,
   },
   stableCoin: {
     address: envConfig.stableCoinAddress,
@@ -45,7 +45,7 @@ export const contractsConfig = {
     abi: FeeManagerArtifact.abi,
   },
   compliance: {
-    // Deployed per-property by TokenizePropertyPage; no fixed address.
+    // Deployed per-asset by TokenizeAssetPage; no fixed address.
     abi: ModularComplianceArtifact.abi,
     bytecode: ModularComplianceArtifact.bytecode,
   },

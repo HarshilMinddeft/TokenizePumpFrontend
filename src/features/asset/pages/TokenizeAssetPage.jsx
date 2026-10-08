@@ -9,12 +9,12 @@ import Textarea from '../../../components/ui/Textarea';
 import Button from '../../../components/ui/Button';
 import Badge from '../../../components/ui/Badge';
 import web3Service from '../../../services/web3Service';
-import propertyApi from '../api/propertyApi';
+import assetApi from '../api/assetApi';
 import envConfig from '../../../config/env.config';
 import contractsConfig from '../../../config/contracts.config';
 import { useWeb3 } from '../../../context/Web3Context';
 import { useZodForm } from '../../../hooks/useZodForm';
-import { tokenizePropertySchema, parseLeadingNumber } from '../schemas/propertySchema';
+import { tokenizeAssetSchema, parseLeadingNumber } from '../schemas/assetSchema';
 import { evenlyDividingTiers, PRICE_STEP } from '../../../utils/units';
 import { formatUsd, shortenAddress } from '../../../lib/utils';
 
@@ -121,9 +121,9 @@ const FilePicker = ({ kind = 'file', preview, fileName, meta, description, accep
 );
 
 /**
- * Live check on whether the entered property price can later be split into
+ * Live check on whether the entered asset price can later be split into
  * whole shares at Fractionalize time. FractionalVault mints
- * propertyPrice / basePrice shares with no remainder allowed
+ * assetPrice / basePrice shares with no remainder allowed
  * (SHARE_DECIMALS == 0), and basePrice is offered in $10 steps there — so a
  * price with no evenly-dividing $10 tier can never be fractionalized. Flags
  * that at entry time rather than letting it surface as a dead end later.
@@ -136,7 +136,7 @@ const getPriceDivisibilityHint = (rawValue) => {
   if (validTiers.length === 0) {
     return {
       tone: 'negative',
-      text: `No $${PRICE_STEP}-multiple price per share divides $${price} evenly — this property won't be fractionalizable later. Choose a price that's a multiple of $${PRICE_STEP}.`,
+      text: `No $${PRICE_STEP}-multiple price per share divides $${price} evenly — this asset won't be fractionalizable later. Choose a price that's a multiple of $${PRICE_STEP}.`,
     };
   }
 
@@ -149,8 +149,8 @@ const getPriceDivisibilityHint = (rawValue) => {
 const FLOW_STEPS = [
   { title: 'Primary image → IPFS', detail: 'Stored on IPFS; used as the NFT artwork' },
   { title: 'Deploy compliance contract', detail: 'Security wrapper for the asset' },
-  { title: 'Ownership hand-over', detail: 'Compliance moved to the property owner' },
-  { title: 'Mint property NFT', detail: 'One NFT per real-world asset' },
+  { title: 'Ownership hand-over', detail: 'Compliance moved to the asset owner' },
+  { title: 'Mint asset NFT', detail: 'One NFT per real-world asset' },
   { title: 'Register with VARELO', detail: 'Gallery, metadata & documents published' },
 ];
 
@@ -158,7 +158,7 @@ const FLOW_STEPS = [
 /* Page                                                                 */
 /* ------------------------------------------------------------------ */
 
-const TokenizePropertyPage = () => {
+const TokenizeAssetPage = () => {
   const { address, isConnected } = useWeb3();
   const [singleImage, setSingleImage] = useState(null);
   const [primaryPreview, setPrimaryPreview] = useState(null);
@@ -174,11 +174,11 @@ const TokenizePropertyPage = () => {
   // instant the whole submit started.
   const [currentStep, setCurrentStep] = useState(-1);
   const [formData, setFormData] = useState({
-    propertyId: '',
+    assetId: '',
     name: '',
-    propertyPrice: '',
-    propertySize: '',
-    propertyOwnerWallet: '',
+    assetPrice: '',
+    assetSize: '',
+    assetOwnerWallet: '',
     features: '',
     offering: '',
     details: '',
@@ -186,23 +186,23 @@ const TokenizePropertyPage = () => {
     location: '',
   });
 
-  const { errors, validate, clearError } = useZodForm(tokenizePropertySchema);
+  const { errors, validate, clearError } = useZodForm(tokenizeAssetSchema);
 
   // Estimated share count once fractionalized, using the cheapest evenly-
   // dividing $10 tier so the preview stays a useful upper bound rather than
   // assuming a fixed $40/share price that may not even divide evenly.
   const expectedTokenCount = useMemo(() => {
-    const price = parseLeadingNumber(formData.propertyPrice);
+    const price = parseLeadingNumber(formData.assetPrice);
     if (Number.isNaN(price) || price <= 0) return 0;
     const [cheapestTier] = evenlyDividingTiers(price);
     return cheapestTier ? Math.floor(price / cheapestTier) : 0;
-  }, [formData.propertyPrice]);
+  }, [formData.assetPrice]);
 
   const fileCount = (singleImage ? 1 : 0) + multipleImages.length + (pdfFile ? 1 : 0);
 
   const priceHint = useMemo(
-    () => (formData.propertyPrice ? getPriceDivisibilityHint(formData.propertyPrice) : null),
-    [formData.propertyPrice],
+    () => (formData.assetPrice ? getPriceDivisibilityHint(formData.assetPrice) : null),
+    [formData.assetPrice],
   );
 
   const handleInputChange = (e) => {
@@ -230,7 +230,7 @@ const TokenizePropertyPage = () => {
   const uploadToPinata = async (file) => {
     const fd = new FormData();
     fd.append('file', file);
-    const data = await propertyApi.uploadNftImage(fd);
+    const data = await assetApi.uploadNftImage(fd);
     return data.url || `${envConfig.ipfsGateway}${data.IpfsHash}`;
   };
 
@@ -243,8 +243,8 @@ const TokenizePropertyPage = () => {
       return;
     }
 
-    const propertySize = parseLeadingNumber(data.propertySize);
-    const propertyPrice = parseLeadingNumber(data.propertyPrice);
+    const assetSize = parseLeadingNumber(data.assetSize);
+    const assetPrice = parseLeadingNumber(data.assetPrice);
 
     setBusy(true);
     setCurrentStep(0);
@@ -273,7 +273,7 @@ const TokenizePropertyPage = () => {
         };
 
         setUploadStatus('Publishing NFT metadata…');
-        const metadataData = await propertyApi.uploadMetadata(metadata);
+        const metadataData = await assetApi.uploadMetadata(metadata);
         const metadataUrl = `${envConfig.publicIpfsGateway}${metadataData.IpfsHash}`;
 
         const signer = await web3Service.getSigner();
@@ -297,30 +297,30 @@ const TokenizePropertyPage = () => {
         const complianceCont = new ethers.Contract(complianceAddress, contractsConfig.compliance.abi, signer);
         setCurrentStep(2);
         setUploadStatus('Transferring ownership to the asset owner…');
-        const changeOwnerCompliance = await complianceCont.transferOwnership(formData.propertyOwnerWallet);
+        const changeOwnerCompliance = await complianceCont.transferOwnership(formData.assetOwnerWallet);
         await changeOwnerCompliance.wait();
 
-        const propertyNftContract = await web3Service.getPropertyNftContract();
+        const assetNftContract = await web3Service.getAssetNftContract();
         setCurrentStep(3);
-        setUploadStatus('Minting the property NFT…');
-        const transaction = await propertyNftContract.mintProperty(
+        setUploadStatus('Minting the asset NFT…');
+        const transaction = await assetNftContract.mintAsset(
           formData.name,
           formData.name,
-          formData.propertyOwnerWallet,
+          formData.assetOwnerWallet,
           metadataUrl,
           formData.location,
-          propertySize,
-          propertyPrice,
+          assetSize,
+          assetPrice,
         );
 
         const receipt = await transaction.wait();
-        const mintedEvent = receipt.events.find((event) => event.event === 'PropertyMinted');
+        const mintedEvent = receipt.events.find((event) => event.event === 'AssetMinted');
         const tokenId = mintedEvent.args.tokenId.toString();
         tokenpId = tokenId;
         const recipient = mintedEvent.args.recipient;
 
         setProUploadStatus(
-          `NFT Minted!\nProperty NFT ID: ${tokenId}\nOwner Address: ${recipient}\nNft Address: ${contractsConfig.propertyNft.address}`,
+          `NFT Minted!\nAsset NFT ID: ${tokenId}\nOwner Address: ${recipient}\nNft Address: ${contractsConfig.assetNft.address}`,
         );
       }
 
@@ -335,26 +335,26 @@ const TokenizePropertyPage = () => {
       let pdfUrl = '';
       if (pdfFile) pdfUrl = await uploadToPinata(pdfFile);
 
-      setUploadStatus('Registering the property…');
+      setUploadStatus('Registering the asset…');
       const finalPayload = {
-        propertyId: tokenpId,
-        propertyName: formData.name,
-        propertyPrice: formData.propertyPrice,
-        propertySize: formData.propertySize,
-        propertyOwnerWallet: formData.propertyOwnerWallet,
-        propertyFeatures: formData.features,
-        offringDetailes: formData.offering,
-        propertyDetailes: formData.details,
-        propertyManagement: formData.management,
-        locationDetailes: formData.location,
-        propertyDocuments: [pdfUrl],
-        propertyImages: multiImageUrls,
-        propertyThumbImages: [singleImageUrl],
+        assetId: tokenpId,
+        assetName: formData.name,
+        assetPrice: formData.assetPrice,
+        assetSize: formData.assetSize,
+        assetOwnerWallet: formData.assetOwnerWallet,
+        assetFeatures: formData.features,
+        offeringDetails: formData.offering,
+        assetDetails: formData.details,
+        assetManagement: formData.management,
+        locationDetails: formData.location,
+        assetDocuments: [pdfUrl],
+        assetImages: multiImageUrls,
+        assetThumbImages: [singleImageUrl],
         complianceAddress: complianceAddress,
         active: true,
       };
 
-      await propertyApi.addProperty(finalPayload);
+      await assetApi.addAsset(finalPayload);
 
       setUploadStatus('');
       toast.success('Process Completed successfully.');
@@ -376,7 +376,7 @@ const TokenizePropertyPage = () => {
     }
   };
 
-  // Admin gate reads AUTHORITY_ROLE / DEFAULT_ADMIN_ROLE from PropertyNFT
+  // Admin gate reads AUTHORITY_ROLE / DEFAULT_ADMIN_ROLE from AssetNFT
   // directly rather than comparing to a single configured address — a
   // wallet granted the role on-chain works without redeploying this app,
   // and one that had it revoked stops seeing a form that would only revert.
@@ -386,7 +386,7 @@ const TokenizePropertyPage = () => {
       return;
     }
     let cancelled = false;
-    web3Service.isPropertyNftAdmin(address).then((result) => {
+    web3Service.isAssetNftAdmin(address).then((result) => {
       if (!cancelled) setIsAdmin(result);
     });
     return () => {
@@ -394,14 +394,14 @@ const TokenizePropertyPage = () => {
     };
   }, [address, isConnected]);
 
-  const hasSummary = formData.name || formData.location || formData.propertyPrice || formData.propertyOwnerWallet;
+  const hasSummary = formData.name || formData.location || formData.assetPrice || formData.assetOwnerWallet;
 
   return (
     <AppLayout>
       <PageHeader
         eyebrow="Administration"
-        title="Tokenize Property"
-        description="Register a real-world asset on-chain — publish its evidence, deploy a compliance wrapper and mint the property NFT in one guided flow."
+        title="Tokenize Asset"
+        description="Register a real-world asset on-chain — publish its evidence, deploy a compliance wrapper and mint the asset NFT in one guided flow."
         icon={
           <path
             strokeLinecap="round"
@@ -424,7 +424,7 @@ const TokenizePropertyPage = () => {
           </div>
           <h2 className="text-lg font-bold text-slate-900 dark:text-white">Admin access required</h2>
           <p className="mx-auto mt-2 max-w-sm text-sm text-slate-500 dark:text-slate-400">
-            Only the marketplace authority or admin wallet can register new properties. Connect an authorized wallet
+            Only the marketplace authority or admin wallet can register new assets. Connect an authorized wallet
             to continue.
           </p>
           <Badge tone="warning" className="mt-4">
@@ -446,7 +446,7 @@ const TokenizePropertyPage = () => {
                   NFT minted — finishing up
                 </h2>
                 <p className="mt-1.5 max-w-md text-sm text-slate-500 dark:text-slate-400">
-                  {uploadStatus || 'Publishing the gallery and registering the property…'}
+                  {uploadStatus || 'Publishing the gallery and registering the asset…'}
                 </p>
               </div>
             ) : propUploadStatus ? (
@@ -460,7 +460,7 @@ const TokenizePropertyPage = () => {
                   </span>
                 </div>
                 <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
-                  Property registered on-chain
+                  Asset registered on-chain
                 </h2>
                 <p className="mt-1.5 max-w-md text-sm text-slate-500 dark:text-slate-400">
                   The NFT is minted and the asset is live in the registry. Save these identifiers.
@@ -488,7 +488,7 @@ const TokenizePropertyPage = () => {
                   })}
                 </div>
                 <Button variant="secondary" className="mt-8" onClick={() => window.location.reload()}>
-                  Register another property
+                  Register another asset
                 </Button>
               </div>
             ) : (
@@ -496,11 +496,11 @@ const TokenizePropertyPage = () => {
                 <div className="divide-y divide-slate-100 px-6 pb-6 sm:px-10 dark:divide-slate-800">
                   {/* 01 Asset identity */}
                   <section className="py-6 first:pt-6">
-                    <SectionHead title="Property" />
+                    <SectionHead title="Asset" />
                     <div className="space-y-4">
                       <Input
                         name="name"
-                        label="Property name"
+                        label="Asset name"
                         value={formData.name}
                         onChange={handleInputChange}
                         placeholder="e.g. Harbourview Tower, Unit 4B"
@@ -517,29 +517,29 @@ const TokenizePropertyPage = () => {
                         required
                       />
                       <Input
-                        name="propertyPrice"
-                        label="Property price (USD)"
+                        name="assetPrice"
+                        label="Asset price (USD)"
                         type="number"
                         min="0"
                         prefix="$"
-                        value={formData.propertyPrice}
+                        value={formData.assetPrice}
                         onChange={handleInputChange}
                         placeholder="500,000"
-                        error={errors.propertyPrice}
+                        error={errors.assetPrice}
                         hint={priceHint?.text}
                         hintTone={priceHint?.tone}
                         required
                       />
                       <Input
-                        name="propertySize"
-                        label="Property size"
+                        name="assetSize"
+                        label="Asset size"
                         type="number"
                         min="0"
                         suffix="sqft"
-                        value={formData.propertySize}
+                        value={formData.assetSize}
                         onChange={handleInputChange}
                         placeholder="1,850"
-                        error={errors.propertySize}
+                        error={errors.assetSize}
                         required
                       />
                     </div>
@@ -549,14 +549,14 @@ const TokenizePropertyPage = () => {
                   <section className="py-6 first:pt-6">
                     <SectionHead title="Ownership" />
                     <Input
-                      name="propertyOwnerWallet"
+                      name="assetOwnerWallet"
                       label="Owner wallet address"
                       leadingIcon={<WalletGlyph />}
-                      value={formData.propertyOwnerWallet}
+                      value={formData.assetOwnerWallet}
                       onChange={handleInputChange}
                       placeholder="0x…"
                       className="font-mono text-[13px]"
-                      error={errors.propertyOwnerWallet}
+                      error={errors.assetOwnerWallet}
                       required
                     />
                   </section>
@@ -584,7 +584,7 @@ const TokenizePropertyPage = () => {
                       />
                       <Textarea
                         name="details"
-                        label="Property details"
+                        label="Asset details"
                         rows={4}
                         value={formData.details}
                         onChange={handleInputChange}
@@ -597,7 +597,7 @@ const TokenizePropertyPage = () => {
                         rows={2}
                         value={formData.management}
                         onChange={handleInputChange}
-                        placeholder="Property management company"
+                        placeholder="Asset management company"
                         error={errors.management}
                       />
                     </div>
@@ -624,7 +624,7 @@ const TokenizePropertyPage = () => {
                         label="Gallery images"
                         multiple
                         accept="image/*"
-                        description="Interior & exterior photos for the property page"
+                        description="Interior & exterior photos for the asset page"
                         fileName={multipleImages.length > 0 ? `${multipleImages.length} image${multipleImages.length > 1 ? 's' : ''}` : ''}
                         meta={
                           multipleImages.length > 0
@@ -666,7 +666,7 @@ const TokenizePropertyPage = () => {
                     disabled={priceHint?.tone === 'negative'}
                     className="sm:min-w-52"
                   >
-                    {busy ? 'Registering…' : 'Register property'}
+                    {busy ? 'Registering…' : 'Register asset'}
                   </Button>
                 </div>
               </form>
@@ -746,14 +746,14 @@ const TokenizePropertyPage = () => {
                 <div className="space-y-2.5">
                   <SummaryRow label="Name" value={formData.name} />
                   <SummaryRow label="Location" value={formData.location} />
-                  <SummaryRow label="Value" value={formData.propertyPrice ? formatUsd(formData.propertyPrice, 0) : undefined} />
-                  <SummaryRow label="Size" value={formData.propertySize ? `${Number(formData.propertySize).toLocaleString('en-US')} sqft` : undefined} />
+                  <SummaryRow label="Value" value={formData.assetPrice ? formatUsd(formData.assetPrice, 0) : undefined} />
+                  <SummaryRow label="Size" value={formData.assetSize ? `${Number(formData.assetSize).toLocaleString('en-US')} sqft` : undefined} />
                   <SummaryRow label="Est. share supply" value={expectedTokenCount > 0 ? expectedTokenCount.toLocaleString('en-US') : undefined} mono />
                   <SummaryRow
                     label="Owner"
                     value={
-                      formData.propertyOwnerWallet?.startsWith('0x') && formData.propertyOwnerWallet.length > 20
-                        ? shortenAddress(formData.propertyOwnerWallet, 8, 6)
+                      formData.assetOwnerWallet?.startsWith('0x') && formData.assetOwnerWallet.length > 20
+                        ? shortenAddress(formData.assetOwnerWallet, 8, 6)
                         : undefined
                     }
                     mono
@@ -785,4 +785,4 @@ const SummaryRow = ({ label, value, mono = false }) => (
   </div>
 );
 
-export default TokenizePropertyPage;
+export default TokenizeAssetPage;

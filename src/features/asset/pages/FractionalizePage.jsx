@@ -2,8 +2,8 @@ import { useMemo, useState } from 'react';
 import { toast } from 'react-toastify';
 import { motion } from 'motion/react';
 import AppLayout from '../../../components/layout/AppLayout';
-import PropertyCard from '../components/PropertyCard';
-import PropertyGridSkeleton from '../components/PropertyGridSkeleton';
+import AssetCard from '../components/AssetCard';
+import AssetGridSkeleton from '../components/AssetGridSkeleton';
 import PageHeader from '../../../components/ui/PageHeader';
 import StatCard from '../../../components/ui/StatCard';
 import Button from '../../../components/ui/Button';
@@ -11,9 +11,9 @@ import Select from '../../../components/ui/Select';
 import EmptyState from '../../../components/ui/EmptyState';
 import Badge from '../../../components/ui/Badge';
 import web3Service from '../../../services/web3Service';
-import propertyApi from '../api/propertyApi';
+import assetApi from '../api/assetApi';
 import contractsConfig from '../../../config/contracts.config';
-import usePropertiesFilteredBy from '../hooks/usePropertiesFilteredBy';
+import useAssetsFilteredBy from '../hooks/useAssetsFilteredBy';
 import { useWeb3 } from '../../../context/Web3Context';
 import { getContractErrorMessage } from '../../../utils/web3Errors';
 import { evenlyDividingTiers, PRICE_STEP } from '../../../utils/units';
@@ -22,8 +22,8 @@ import { formatNumber, formatUsd, shortenAddress } from '../../../lib/utils';
 /** Suggested price per share, in whole dollars, when the owner hasn't chosen one. */
 const DEFAULT_BASE_PRICE = 40;
 
-const isNotFractionalized = async (property, propertyNftContract) => {
-  const isFrac = await propertyNftContract.isFractionalized(property.propertyId);
+const isNotFractionalized = async (asset, assetNftContract) => {
+  const isFrac = await assetNftContract.isFractionalized(asset.assetId);
   return !isFrac;
 };
 
@@ -37,8 +37,8 @@ const rise = {
 };
 
 /** Cheapest evenly-dividing tier — used for the estimate before the owner picks one. */
-const cheapestTierFor = (propertyPrice) => {
-  const tiers = evenlyDividingTiers(propertyPrice);
+const cheapestTierFor = (assetPrice) => {
+  const tiers = evenlyDividingTiers(assetPrice);
   return tiers.includes(DEFAULT_BASE_PRICE) ? DEFAULT_BASE_PRICE : tiers[0];
 };
 
@@ -48,52 +48,52 @@ const FractionalizePage = () => {
   const [basePrices, setBasePrices] = useState({});
   const [busyId, setBusyId] = useState(null);
 
-  const { properties, loading } = usePropertiesFilteredBy(
-    () => (userAddress ? propertyApi.getOwnerProperties(userAddress) : Promise.resolve({ properties: [] })),
+  const { assets, loading } = useAssetsFilteredBy(
+    () => (userAddress ? assetApi.getOwnerAssets(userAddress) : Promise.resolve({ assets: [] })),
     isNotFractionalized,
-    web3Service.getReadOnlyPropertyNftContract,
+    web3Service.getReadOnlyAssetNftContract,
     [userAddress],
   );
 
   const totals = useMemo(() => {
     let value = 0;
     let shares = 0;
-    for (const p of properties) {
-      value += Number(p.propertyPrice) || 0;
-      const tier = cheapestTierFor(p.propertyPrice);
-      shares += tier ? Math.floor(Number(p.propertyPrice) / tier) : 0;
+    for (const p of assets) {
+      value += Number(p.assetPrice) || 0;
+      const tier = cheapestTierFor(p.assetPrice);
+      shares += tier ? Math.floor(Number(p.assetPrice) / tier) : 0;
     }
     return { value, shares };
-  }, [properties]);
+  }, [assets]);
 
   const fractionalize = async (tokenId, complianceAddress, basePrice) => {
     setBusyId(tokenId);
     try {
-      const propertyNftContract = await web3Service.getPropertyNftContract();
-      const approveTx = await propertyNftContract.approve(contractsConfig.vault.address, tokenId);
+      const assetNftContract = await web3Service.getAssetNftContract();
+      const approveTx = await assetNftContract.approve(contractsConfig.vault.address, tokenId);
       await approveTx.wait();
 
       const vaultContract = await web3Service.getVaultContract();
-      // _basePrice divides the NFT's propertyPrice, which is stored as a
+      // _basePrice divides the NFT's assetPrice, which is stored as a
       // whole-dollar figure — so it is passed unscaled, not in stablecoin units.
-      const vaultTx = await vaultContract.fractionalizeProperty(
+      const vaultTx = await vaultContract.fractionalizeAsset(
         tokenId,
         complianceAddress,
         Math.floor(Number(basePrice)),
       );
       await vaultTx.wait();
 
-      const propertyToken = await vaultContract.fractionalData(tokenId);
+      const assetToken = await vaultContract.fractionalData(tokenId);
       setFractionalEvents((prev) => ({
         ...prev,
         [tokenId]: {
-          shareToken: propertyToken.tokenAddress,
-          totalShares: propertyToken.totalShares.toString(),
-          originalOwner: propertyToken.originalOwner,
-          complianceAddress: propertyToken.complianceAddress,
+          shareToken: assetToken.tokenAddress,
+          totalShares: assetToken.totalShares.toString(),
+          originalOwner: assetToken.originalOwner,
+          complianceAddress: assetToken.complianceAddress,
         },
       }));
-      toast.success('Property fractionalized successfully.');
+      toast.success('Asset fractionalized successfully.');
     } catch (error) {
       console.error('Error in Fractionalize:', error);
       toast.error(getContractErrorMessage(error, 'Fractionalization failed. Please try again.'));
@@ -106,8 +106,8 @@ const FractionalizePage = () => {
     <AppLayout>
       <PageHeader
         eyebrow="Your assets"
-        title="Fractionalize Property"
-        description="Split a tokenized property into a compliant share token. Fractionalized assets can then be listed on the marketplace or traded via the order book."
+        title="Fractionalize Asset"
+        description="Split a tokenized asset into a compliant share token. Fractionalized assets can then be listed on the marketplace or traded via the order book."
         icon={
           <path
             strokeLinecap="round"
@@ -120,13 +120,13 @@ const FractionalizePage = () => {
       {!loading && (
         <div className="mb-8 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
           <StatCard
-            label="Eligible properties"
-            value={formatNumber(properties.length, 0)}
+            label="Eligible assets"
+            value={formatNumber(assets.length, 0)}
             tone="brand"
             icon={<ChipIcon />}
           />
           <StatCard
-            label="Shares to be created across all properties"
+            label="Shares to be created across all assets"
             value={formatNumber(totals.shares, 0)}
             sub="At each one's cheapest divisible price"
             tone="success"
@@ -135,7 +135,7 @@ const FractionalizePage = () => {
           <StatCard
             label="Asset value unlocking"
             value={formatUsd(totals.value, 0)}
-            sub="across eligible properties"
+            sub="across eligible assets"
             tone="warning"
             icon={<TrendIcon />}
           />
@@ -143,29 +143,29 @@ const FractionalizePage = () => {
       )}
 
       {loading ? (
-        <PropertyGridSkeleton />
-      ) : properties.length > 0 ? (
+        <AssetGridSkeleton />
+      ) : assets.length > 0 ? (
         <motion.div
           variants={stagger}
           initial="hidden"
           animate="show"
           className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3"
         >
-          {properties.map((prop) => {
-            const validTiers = evenlyDividingTiers(prop.propertyPrice);
+          {assets.map((prop) => {
+            const validTiers = evenlyDividingTiers(prop.assetPrice);
             const defaultTier = validTiers.includes(DEFAULT_BASE_PRICE) ? DEFAULT_BASE_PRICE : validTiers[0];
-            const basePrice = basePrices[prop.propertyId] ?? String(defaultTier ?? '');
-            const shares = Number(basePrice) > 0 ? Math.floor(Number(prop.propertyPrice) / Number(basePrice)) : 0;
-            const done = fractionalEvents[prop.propertyId];
+            const basePrice = basePrices[prop.assetId] ?? String(defaultTier ?? '');
+            const shares = Number(basePrice) > 0 ? Math.floor(Number(prop.assetPrice) / Number(basePrice)) : 0;
+            const done = fractionalEvents[prop.assetId];
 
             return (
-              <motion.div key={prop.propertyId} variants={rise} className="h-full">
-                <PropertyCard property={prop}>
+              <motion.div key={prop.assetId} variants={rise} className="h-full">
+                <AssetCard asset={prop}>
                   {done ? (
                     <SuccessPanel
                       shareToken={done.shareToken}
                       totalShares={done.totalShares}
-                      caption="This property is now fractionalized. List it on the marketplace to start selling shares."
+                      caption="This asset is now fractionalized. List it on the marketplace to start selling shares."
                     />
                   ) : (
                     <div className="space-y-3">
@@ -173,7 +173,7 @@ const FractionalizePage = () => {
                         <Select
                           label="Price per share"
                           value={basePrice}
-                          onChange={(e) => setBasePrices((prev) => ({ ...prev, [prop.propertyId]: e.target.value }))}
+                          onChange={(e) => setBasePrices((prev) => ({ ...prev, [prop.assetId]: e.target.value }))}
                         >
                           {validTiers.map((tier) => (
                             <option key={tier} value={tier}>
@@ -183,7 +183,7 @@ const FractionalizePage = () => {
                         </Select>
                       ) : (
                         <p className="text-xs font-medium text-red-500 dark:text-red-400">
-                          No ${PRICE_STEP}-multiple price evenly divides ${prop.propertyPrice} — this property
+                          No ${PRICE_STEP}-multiple price evenly divides ${prop.assetPrice} — this asset
                           cannot be fractionalized into whole shares.
                         </p>
                       )}
@@ -195,32 +195,32 @@ const FractionalizePage = () => {
                       </div>
                       <Button
                         fullWidth
-                        loading={busyId === prop.propertyId}
+                        loading={busyId === prop.assetId}
                         disabled={shares === 0}
-                        onClick={() => fractionalize(prop.propertyId, prop.complianceAddress, basePrice)}
+                        onClick={() => fractionalize(prop.assetId, prop.complianceAddress, basePrice)}
                       >
-                        Fractionalize property
+                        Fractionalize asset
                       </Button>
                       <p className="text-center text-[11px] text-slate-400 dark:text-slate-500">
                         Approve the NFT, then the vault mints the share token
                       </p>
                     </div>
                   )}
-                </PropertyCard>
+                </AssetCard>
               </motion.div>
             );
           })}
         </motion.div>
       ) : (
         <EmptyState
-          title="No properties ready to fractionalize"
+          title="No assets ready to fractionalize"
           action={
-            <Button variant="soft" size="sm" onClick={() => (window.location.href = '/tokenize-property')}>
-              Tokenize a property first
+            <Button variant="soft" size="sm" onClick={() => (window.location.href = '/tokenize-asset')}>
+              Tokenize an asset first
             </Button>
           }
         >
-          You don’t own any tokenized properties yet. Once an asset NFT is minted to your wallet it will appear here.
+          You don’t own any tokenized assets yet. Once an asset NFT is minted to your wallet it will appear here.
         </EmptyState>
       )}
     </AppLayout>

@@ -16,7 +16,7 @@ const WalletIcon = () => (
 );
 
 /**
- * Minimal top bar for public pages (Marketplace, Property details) — no
+ * Minimal top bar for public pages (Marketplace, Asset details) — no
  * sidebar, no hamburger menu. Visitors can browse without a wallet; a
  * connected wallet just shows its short address here, it never switches
  * these two pages over to the sidebar app-shell.

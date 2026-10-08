@@ -31,8 +31,8 @@ export const envConfig = {
   // Admin Account
   adminWalletAddress: (import.meta.env.VITE_ADMIN_WALLET_ADDRESS || '').toLowerCase(),
 
-  // External Google Form property owners fill in to request tokenization
-  // (landing page "Tokenize yours" / "List your property" CTAs).
+  // External Google Form asset owners fill in to request tokenization
+  // (landing page "Tokenize yours" / "List your asset" CTAs).
   tokenizeFormUrl: import.meta.env.VITE_TOKENIZE_FORM_URL || 'https://forms.gle/7uGwaGCSjFRXozseA',
 
   // WalletConnect

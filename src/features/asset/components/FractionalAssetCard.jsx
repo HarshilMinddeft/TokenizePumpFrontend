@@ -2,15 +2,15 @@ import { toast } from 'react-toastify';
 import { cn } from '../../../lib/utils';
 
 /**
- * FractionalPropertyCard — dark-themed property card for the fractional marketplace.
- * @param {object} property { image, location, title, totalValue, fractionPrice, fundedPercent, apy }
+ * FractionalAssetCard — dark-themed asset card for the fractional marketplace.
+ * @param {object} asset { image, location, title, totalValue, fractionPrice, fundedPercent, apy }
  */
-const FractionalPropertyCard = ({ property, onInvest, className = '' }) => {
-  const { image, location, title, totalValue, fractionPrice, fundedPercent = 0, apy } = property;
+const FractionalAssetCard = ({ asset, onInvest, className = '' }) => {
+  const { image, location, title, totalValue, fractionPrice, fundedPercent = 0, apy } = asset;
 
   const handleInvest = () => {
-    toast.success('Connecting to property contract...');
-    onInvest?.(property);
+    toast.success('Connecting to asset contract...');
+    onInvest?.(asset);
   };
 
   return (
@@ -74,4 +74,4 @@ const FractionalPropertyCard = ({ property, onInvest, className = '' }) => {
   );
 };
 
-export default FractionalPropertyCard;
+export default FractionalAssetCard;

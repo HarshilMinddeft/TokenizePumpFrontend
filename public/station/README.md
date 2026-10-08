@@ -8,16 +8,32 @@ and are served as-is by Vite from `public/`.
 - `three-d-stage.js` — the `<three-d-stage>` viewer web component the scene
   mounts into.
 - `assets/logo.webp` — brand logo used on in-scene signage.
-- `uploads/*.glb` — **not committed to git** (~82MB, listed in
-  `.gitignore`). The scene fetches them at runtime and needs them present
-  on disk, whether or not they're tracked in git. There is no longer a
-  backup copy anywhere else in the repo (the original prototype export
-  folder was deleted once this directory was confirmed working) — if these
-  files are ever lost, they need to be re-sourced from wherever the
-  original prototype export came from, or regenerated for the Phase 2
-  model-compression pass.
+- `models/*.glb` — the models the scene fetches at runtime (~27MB). These
+  are the optimized versions and are committed; the original exports
+  (~81MB) are not kept in the repo.
 
-This whole directory is a stand-in for the Phase 2 port (native `three` ES
-modules + `GLTFLoader`, see the landing-page port plan) and the follow-up
-model-compression pass (Draco/Meshopt via `@gltf-transform/cli`), after
-which the compressed models are small enough to commit normally.
+  To add or replace a model, put the original export in `models-src/station/`
+  (git-ignored) and run
+
+      npm run models:optimize
+
+  which writes the optimized copy into `models/` (`scripts/optimize-models.mjs`).
+  Don't re-run the optimizer on files already in `models/` — simplification
+  is lossy, so it would degrade them a second time.
+
+## Model optimization
+
+The scene parses GLBs with its own loader (`loadGLB` in the HTML), not
+three's `GLTFLoader`, and that loader has no Draco or Meshopt decoder. So the
+optimizer only uses steps whose output stays a plain GLB it can read: merge
+duplicate data and vertices, simplify the over-dense car meshes within a
+small error bound, and shrink oversized textures (same image formats). The
+script fails if its output would need anything that loader can't decode.
+
+Measured against the originals (same scene, same camera zones, software
+WebGL): models load ~38% faster, JS memory drops from 178MB to 132MB, and
+triangles per frame fall 30–55% depending on the zone, with no visible
+change in screenshots of any zone.
+
+Draco/Meshopt would shrink the files further, but needs a decoder in the
+loader — that's the Phase 2 port (native `three` ES modules + `GLTFLoader`).

@@ -3,8 +3,8 @@ import { useWeb3 } from '../../context/Web3Context';
 import envConfig from '../../config/env.config';
 import { cn } from '../../lib/utils';
 import { NAV_GROUPS } from '../../config/navigation';
-import useAuthorityRole from '../../features/property/hooks/useAuthorityRole';
-import useHasActiveBuyBack from '../../features/property/hooks/useHasActiveBuyBack';
+import useAuthorityRole from '../../features/asset/hooks/useAuthorityRole';
+import useHasActiveBuyBack from '../../features/asset/hooks/useHasActiveBuyBack';
 import BrandLogo from './BrandLogo';
 
 const NavItem = ({ item, isActive, onClick }) => (

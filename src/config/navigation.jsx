@@ -25,7 +25,7 @@ export const NAV_GROUPS = [
     label: 'Your assets',
     items: [
       {
-        path: ROUTES.fractionalizeProperty,
+        path: ROUTES.fractionalizeAsset,
         label: 'Fractionalize',
         icon: (
           <path
@@ -36,7 +36,7 @@ export const NAV_GROUPS = [
         ),
       },
       {
-        path: ROUTES.listProperty,
+        path: ROUTES.listAsset,
         label: 'List to Marketplace',
         icon: (
           <path
@@ -47,8 +47,8 @@ export const NAV_GROUPS = [
         ),
       },
       {
-        path: ROUTES.redeemProperty,
-        label: 'Redeem Property',
+        path: ROUTES.redeemAsset,
+        label: 'Redeem Asset',
         icon: (
           <path
             strokeLinecap="round"
@@ -91,8 +91,8 @@ export const NAV_GROUPS = [
     adminOnly: true,
     items: [
       {
-        path: ROUTES.tokenizeProperty,
-        label: 'Tokenize Property',
+        path: ROUTES.tokenizeAsset,
+        label: 'Tokenize Asset',
         icon: (
           <path
             strokeLinecap="round"
@@ -103,7 +103,7 @@ export const NAV_GROUPS = [
       },
       {
         path: ROUTES.updatePrice,
-        label: 'Change Property Price',
+        label: 'Change Asset Price',
         icon: (
           <path
             strokeLinecap="round"
@@ -131,19 +131,19 @@ export const NAV_GROUPS = [
 export const PAGE_META = {
   [ROUTES.marketplace]: { title: 'Marketplace', section: 'Explore' },
   [ROUTES.appMarketplace]: { title: 'Marketplace', section: 'Explore' },
-  [ROUTES.fractionalizeProperty]: { title: 'Fractionalize Property', section: 'Your assets' },
-  [ROUTES.listProperty]: { title: 'List to Marketplace', section: 'Your assets' },
-  [ROUTES.redeemProperty]: { title: 'Redeem Property', section: 'Your assets' },
+  [ROUTES.fractionalizeAsset]: { title: 'Fractionalize Asset', section: 'Your assets' },
+  [ROUTES.listAsset]: { title: 'List to Marketplace', section: 'Your assets' },
+  [ROUTES.redeemAsset]: { title: 'Redeem Asset', section: 'Your assets' },
   [ROUTES.cancelListing]: { title: 'Cancel Listing', section: 'Your assets' },
   [ROUTES.withdrawBuyBack]: { title: 'Withdraw Buyback', section: 'Your assets' },
-  [ROUTES.tokenizeProperty]: { title: 'Tokenize Property', section: 'Administration' },
-  [ROUTES.updatePrice]: { title: 'Change Property Price', section: 'Administration' },
+  [ROUTES.tokenizeAsset]: { title: 'Tokenize Asset', section: 'Administration' },
+  [ROUTES.updatePrice]: { title: 'Change Asset Price', section: 'Administration' },
   [ROUTES.updateBuyBackBPS]: { title: 'Update Buyback BPS', section: 'Administration' },
 };
 
 export const getPageMeta = (pathname) => {
-  if (pathname.startsWith('/properties/') || pathname.startsWith('/app/properties/')) {
-    return { title: 'Property details', section: 'Marketplace' };
+  if (pathname.startsWith('/assets/') || pathname.startsWith('/app/assets/')) {
+    return { title: 'Asset details', section: 'Marketplace' };
   }
   return PAGE_META[pathname] || { title: 'Dashboard', section: 'VARELO' };
 };

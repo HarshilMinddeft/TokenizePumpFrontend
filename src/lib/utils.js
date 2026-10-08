@@ -33,8 +33,8 @@ export const shortenAddress = (address, lead = 6, tail = 4) => {
 
 /** Expected fractional share count = floor(price / 40), matching the vault flow. */
 export const SHARES_PER_DOLLAR_DIVISOR = 40;
-export const expectedShares = (propertyPrice) =>
-  Math.max(0, Math.floor(Number(propertyPrice) / SHARES_PER_DOLLAR_DIVISOR));
+export const expectedShares = (assetPrice) =>
+  Math.max(0, Math.floor(Number(assetPrice) / SHARES_PER_DOLLAR_DIVISOR));
 
 /** Safe percentage: (part / total) * 100, 0..100 */
 export const toPercent = (part, total) => {

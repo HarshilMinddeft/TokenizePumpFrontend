@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import PublicLayout from '../../../components/layout/PublicLayout';
 import AppLayout from '../../../components/layout/AppLayout';
-import PropertyCard from '../components/PropertyCard';
+import AssetCard from '../components/AssetCard';
 import PageHeader from '../../../components/ui/PageHeader';
 import StatCard from '../../../components/ui/StatCard';
 import Skeleton from '../../../components/ui/Skeleton';
@@ -11,19 +11,19 @@ import EmptyState from '../../../components/ui/EmptyState';
 import Input from '../../../components/ui/Input';
 import Button from '../../../components/ui/Button';
 import Badge from '../../../components/ui/Badge';
-import { getPropertyDetailsPath, getAppPropertyDetailsPath } from '../../../config/routes';
+import { getAssetDetailsPath, getAppAssetDetailsPath } from '../../../config/routes';
 import web3Service from '../../../services/web3Service';
-import propertyApi from '../api/propertyApi';
-import usePropertiesFilteredBy from '../hooks/usePropertiesFilteredBy';
+import assetApi from '../api/assetApi';
+import useAssetsFilteredBy from '../hooks/useAssetsFilteredBy';
 import { cn, formatNumber } from '../../../lib/utils';
 
 // cancelListing sets active = false in the same call that may open a
 // buyback, so a listing with a live buyback (holders can still sell back)
 // always has active == false too. Keep it visible here — it's still the
-// only way holders reach PropertyDetailPage to call sellTokensBack — rather
+// only way holders reach AssetDetailPage to call sellTokensBack — rather
 // than filtering strictly on `active`, which would make it unreachable.  
-const isActivelyListed = async (property, marketplaceContract) => {
-  const listing = await marketplaceContract.listings(property.propertyId);
+const isActivelyListed = async (asset, marketplaceContract) => {
+  const listing = await marketplaceContract.listings(asset.assetId);
   return listing.active || listing.buyBack;
 };
 
@@ -58,37 +58,37 @@ const GridSkeleton = () => (
 
 const MarketplacePage = ({ isPublic = false }) => {
   const Layout = isPublic ? PublicLayout : AppLayout;
-  const detailPath = isPublic ? getPropertyDetailsPath : getAppPropertyDetailsPath;
+  const detailPath = isPublic ? getAssetDetailsPath : getAppAssetDetailsPath;
 
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState('newest');
 
-  const { properties, loading } = usePropertiesFilteredBy(
-    propertyApi.getAllMarketplaceProperties,
+  const { assets, loading } = useAssetsFilteredBy(
+    assetApi.getAllMarketplaceAssets,
     isActivelyListed,
     web3Service.getReadOnlyMarketplaceContract,
   );
 
-  // A property can show up here either as a normal buyable listing or as a
+  // An asset can show up here either as a normal buyable listing or as a
   // cancelled listing with a still-open buyback (isActivelyListed keeps
   // both) — flag the latter so the card doesn't read as "buy now" for
   // something that's actually delisted and only sellable back.
   const [buyBackOnly, setBuyBackOnly] = useState({});
 
   useEffect(() => {
-    if (properties.length === 0) return;
+    if (assets.length === 0) return;
     let cancelled = false;
 
     (async () => {
       const marketplace = web3Service.getReadOnlyMarketplaceContract();
       const flags = {};
-      for (const prop of properties) {
+      for (const prop of assets) {
         try {
-          const listing = await marketplace.listings(prop.propertyId);
-          flags[prop.propertyId] = !listing.active && listing.buyBack;
+          const listing = await marketplace.listings(prop.assetId);
+          flags[prop.assetId] = !listing.active && listing.buyBack;
         } catch (err) {
-          console.error(`Error checking buyback status for property ${prop.propertyId}:`, err);
+          console.error(`Error checking buyback status for asset ${prop.assetId}:`, err);
         }
       }
       if (!cancelled) setBuyBackOnly(flags);
@@ -97,39 +97,39 @@ const MarketplacePage = ({ isPublic = false }) => {
     return () => {
       cancelled = true;
     };
-  }, [properties]);
+  }, [assets]);
 
   const filtered = useMemo(() => {
-    if (!query.trim()) return properties;
+    if (!query.trim()) return assets;
     const q = query.trim().toLowerCase();
-    return properties.filter(
+    return assets.filter(
       (p) =>
-        String(p.propertyName || '').toLowerCase().includes(q) ||
-        String(p.locationDetailes || '').toLowerCase().includes(q) ||
-        String(p.propertyId).includes(q),
+        String(p.assetName || '').toLowerCase().includes(q) ||
+        String(p.locationDetails || '').toLowerCase().includes(q) ||
+        String(p.assetId).includes(q),
     );
-  }, [properties, query]);
+  }, [assets, query]);
 
   const sorted = useMemo(() => {
     const list = [...filtered];
-    if (sort === 'price-high') list.sort((a, b) => Number(b.propertyPrice) - Number(a.propertyPrice));
-    if (sort === 'price-low') list.sort((a, b) => Number(a.propertyPrice) - Number(b.propertyPrice));
-    if (sort === 'size-high') list.sort((a, b) => Number(b.propertySize) - Number(a.propertySize));
+    if (sort === 'price-high') list.sort((a, b) => Number(b.assetPrice) - Number(a.assetPrice));
+    if (sort === 'price-low') list.sort((a, b) => Number(a.assetPrice) - Number(b.assetPrice));
+    if (sort === 'size-high') list.sort((a, b) => Number(b.assetSize) - Number(a.assetSize));
     return list;
   }, [filtered, sort]);
 
   const totals = useMemo(() => {
-    const totalValue = properties.reduce((sum, p) => sum + (Number(p.propertyPrice) || 0), 0);
-    const totalSize = properties.reduce((sum, p) => sum + (Number(p.propertySize) || 0), 0);
+    const totalValue = assets.reduce((sum, p) => sum + (Number(p.assetPrice) || 0), 0);
+    const totalSize = assets.reduce((sum, p) => sum + (Number(p.assetSize) || 0), 0);
     return { totalValue, totalSize };
-  }, [properties]);
+  }, [assets]);
 
   return (
     <Layout>
       <PageHeader
         eyebrow="Explore"
         title="Marketplace"
-        description="Browse tokenized real-world assets that are actively listed. Every property is fractionalized, on-chain and verified before it reaches the floor."
+        description="Browse tokenized real-world assets that are actively listed. Every asset is fractionalized, on-chain and verified before it reaches the floor."
         icon={
           <path
             strokeLinecap="round"
@@ -143,7 +143,7 @@ const MarketplacePage = ({ isPublic = false }) => {
       <div className="mb-8 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <StatCard
           label="Live listings"
-          value={loading ? '…' : formatNumber(properties.length, 0)}
+          value={loading ? '…' : formatNumber(assets.length, 0)}
           tone="brand"
           icon={<BuildingIcon />}
         />
@@ -163,7 +163,7 @@ const MarketplacePage = ({ isPublic = false }) => {
         />
         <StatCard
           label="Avg asset value"
-          value={loading || !properties.length ? '—' : `$${formatNumber(totals.totalValue / properties.length, 0)}`}
+          value={loading || !assets.length ? '—' : `$${formatNumber(totals.totalValue / assets.length, 0)}`}
           sub="per listing"
           tone="warning"
           icon={<TrendIcon />}
@@ -177,7 +177,7 @@ const MarketplacePage = ({ isPublic = false }) => {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search by name, location or ID…"
-            aria-label="Search properties"
+            aria-label="Search assets"
             leadingIcon={
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path
@@ -192,7 +192,7 @@ const MarketplacePage = ({ isPublic = false }) => {
 
         <div className="flex items-center gap-2">
           <span className="hidden text-xs font-medium text-slate-400 sm:block dark:text-slate-500">
-            {loading ? 'Syncing…' : `${sorted.length} of ${properties.length} properties`}
+            {loading ? 'Syncing…' : `${sorted.length} of ${assets.length} assets`}
           </span>
           <SortPills sort={sort} onChange={setSort} />
         </div>
@@ -209,20 +209,20 @@ const MarketplacePage = ({ isPublic = false }) => {
           className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3"
         >
           {sorted.map((prop) => (
-            <motion.div key={prop.propertyId} variants={item} className="h-full">
-              <PropertyCard property={prop} onClick={() => navigate(detailPath(prop.propertyId))}>
-                {buyBackOnly[prop.propertyId] && (
+            <motion.div key={prop.assetId} variants={item} className="h-full">
+              <AssetCard asset={prop} onClick={() => navigate(detailPath(prop.assetId))}>
+                {buyBackOnly[prop.assetId] && (
                   <Badge tone="warning" dot>
                     Buyback open — not for sale
                   </Badge>
                 )}
-              </PropertyCard>
+              </AssetCard>
             </motion.div>
           ))}
         </motion.div>
       ) : query ? (
         <EmptyState
-          title="No matching properties"
+          title="No matching assets"
           icon={<SearchIcon />}
           action={
             <Button variant="secondary" size="sm" onClick={() => setQuery('')}>
@@ -230,22 +230,22 @@ const MarketplacePage = ({ isPublic = false }) => {
             </Button>
           }
         >
-          Nothing matched “{query}”. Try a different name, location or property ID.
+          Nothing matched “{query}”. Try a different name, location or asset ID.
         </EmptyState>
       ) : (
         <EmptyState
-          title="No properties are currently listed"
+          title="No assets are currently listed"
           action={
             <Button
               variant="soft"
               size="sm"
-              onClick={() => navigate('/fractionalize-property')}
+              onClick={() => navigate('/fractionalize-asset')}
             >
               Go to your assets
             </Button>
           }
         >
-          When a property owner lists shares on the marketplace they will appear here. Check back soon.
+          When an asset owner lists shares on the marketplace they will appear here. Check back soon.
         </EmptyState>
       )}
     </Layout>

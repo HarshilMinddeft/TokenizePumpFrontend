@@ -3,8 +3,8 @@ import { ethers } from 'ethers';
 import { toast } from 'react-toastify';
 import { motion } from 'motion/react';
 import AppLayout from '../../../components/layout/AppLayout';
-import PropertyCard from '../components/PropertyCard';
-import PropertyGridSkeleton from '../components/PropertyGridSkeleton';
+import AssetCard from '../components/AssetCard';
+import AssetGridSkeleton from '../components/AssetGridSkeleton';
 import PageHeader from '../../../components/ui/PageHeader';
 import StatCard from '../../../components/ui/StatCard';
 import Button from '../../../components/ui/Button';
@@ -12,7 +12,7 @@ import Input from '../../../components/ui/Input';
 import EmptyState from '../../../components/ui/EmptyState';
 import Badge from '../../../components/ui/Badge';
 import web3Service from '../../../services/web3Service';
-import propertyApi from '../api/propertyApi';
+import assetApi from '../api/assetApi';
 import contractsConfig from '../../../config/contracts.config';
 import { useWeb3 } from '../../../context/Web3Context';
 import { getContractErrorMessage } from '../../../utils/web3Errors';
@@ -40,11 +40,11 @@ const rise = {
 
 const CancelListingPage = () => {
   const { address: currentSigner } = useWeb3();
-  const [properties, setProperties] = useState([]);
+  const [assets, setAssets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [fractionalEvents, setFractionalEvents] = useState({});
   const [userTokenBalances, setUserTokenBalances] = useState([]);
-  const [propertyShares, setPropertyShares] = useState({});
+  const [assetShares, setAssetShares] = useState({});
   const [listingOwners, setListingOwners] = useState({});
   const [lockedByBuyBack, setLockedByBuyBack] = useState({});
   const [buyBackDeadlines, setBuyBackDeadlines] = useState({});
@@ -55,23 +55,23 @@ const CancelListingPage = () => {
 
   const totals = useMemo(() => {
     let shares = 0;
-    for (const key of Object.keys(propertyShares)) {
-      shares += Number(propertyShares[key]) || 0;
+    for (const key of Object.keys(assetShares)) {
+      shares += Number(assetShares[key]) || 0;
     }
-    return { count: properties.length, shares };
-  }, [properties, propertyShares]);
+    return { count: assets.length, shares };
+  }, [assets, assetShares]);
 
-  const fetchProperties = async () => {
+  const fetchAssets = async () => {
     try {
-      const data = await propertyApi.getAllMarketplaceProperties();
-      const allProps = data.properties || [];
+      const data = await assetApi.getAllMarketplaceAssets();
+      const allProps = data.assets || [];
 
       const marketplaceContract = web3Service.getReadOnlyMarketplaceContract();
       const filteredProps = [];
       for (const prop of allProps) {
         try {
-          const checkListing = await marketplaceContract.listings(prop.propertyId);
-          const outstanding = await marketplaceContract.outstandingTokens(prop.propertyId);
+          const checkListing = await marketplaceContract.listings(prop.assetId);
+          const outstanding = await marketplaceContract.outstandingTokens(prop.assetId);
 
           // cancelListing is now also callable on a sold-out listing (active
           // flips false in buyTokens once remainingTokens hits 0) as long as
@@ -83,19 +83,19 @@ const CancelListingPage = () => {
           if (!checkListing.active && !hasUnsettledBuyBack) continue;
 
           filteredProps.push(prop);
-          setPropertyShares((prev) => ({
+          setAssetShares((prev) => ({
             ...prev,
-            [prop.propertyId]: formatShares(checkListing.totalTokens),
+            [prop.assetId]: formatShares(checkListing.totalTokens),
           }));
           setOutstandingShares((prev) => ({
             ...prev,
-            [prop.propertyId]: formatShares(outstanding),
+            [prop.assetId]: formatShares(outstanding),
           }));
           setListingPrices((prev) => ({
             ...prev,
-            [prop.propertyId]: formatStable(checkListing.pricePerToken),
+            [prop.assetId]: formatStable(checkListing.pricePerToken),
           }));
-          setListingOwners((prev) => ({ ...prev, [prop.propertyId]: checkListing.owner }));
+          setListingOwners((prev) => ({ ...prev, [prop.assetId]: checkListing.owner }));
           // A listing with escrow still committed to holders can't be
           // cancelled again until the claim window closes and the owner
           // withdraws — cancelListing itself reverts (BuyBackActive) in
@@ -103,19 +103,19 @@ const CancelListingPage = () => {
           // buyback price.
           setLockedByBuyBack((prev) => ({
             ...prev,
-            [prop.propertyId]: !checkListing.buyBackEscrow.isZero(),
+            [prop.assetId]: !checkListing.buyBackEscrow.isZero(),
           }));
           setBuyBackDeadlines((prev) => ({
             ...prev,
-            [prop.propertyId]: checkListing.buyBackDeadline.toString(),
+            [prop.assetId]: checkListing.buyBackDeadline.toString(),
           }));
         } catch (err) {
-          console.error(`Error checking marketplace listing for token ${prop.propertyId}:`, err);
+          console.error(`Error checking marketplace listing for token ${prop.assetId}:`, err);
         }
       }
-      setProperties(filteredProps);
+      setAssets(filteredProps);
     } catch (err) {
-      console.error('Error fetching properties:', err);
+      console.error('Error fetching assets:', err);
     } finally {
       setLoading(false);
     }
@@ -128,9 +128,9 @@ const CancelListingPage = () => {
       const vaultContract = web3Service.getReadOnlyVaultContract();
       const balances = [];
 
-      for (const prop of properties) {
+      for (const prop of assets) {
         try {
-          const fractionalData = await vaultContract.fractionalData(prop.propertyId);
+          const fractionalData = await vaultContract.fractionalData(prop.assetId);
           const tokenAddress = fractionalData.tokenAddress;
 
           if (tokenAddress && tokenAddress !== ethers.constants.AddressZero) {
@@ -142,14 +142,14 @@ const CancelListingPage = () => {
             ]);
 
             balances.push({
-              propertyId: prop.propertyId,
+              assetId: prop.assetId,
               tokenAddress,
               symbol,
               balance: formatShares(balance),
             });
           }
         } catch (err) {
-          console.error(`Failed for property ID ${prop.propertyId}:`, err);
+          console.error(`Failed for asset ID ${prop.assetId}:`, err);
         }
       }
       setUserTokenBalances(balances);
@@ -184,7 +184,7 @@ const CancelListingPage = () => {
 
       const listing = await marketplaceContract.listings(tokenId);
       const listingData = {
-        propertyTokenAddress: listing.propertyToken,
+        assetTokenAddress: listing.assetToken,
         remainingTokens: formatShares(listing.remainingTokens),
         buyBackActivated: listing.buyBack,
         buyBackDeadline: listing.buyBackDeadline.toString(),
@@ -208,14 +208,14 @@ const CancelListingPage = () => {
   };
 
   useEffect(() => {
-    if (properties.length > 0 && currentSigner) {
+    if (assets.length > 0 && currentSigner) {
       fetchUserTokenBalance();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [properties, currentSigner]);
+  }, [assets, currentSigner]);
 
   useEffect(() => {
-    fetchProperties();
+    fetchAssets();
   }, []);
 
   return (
@@ -223,7 +223,7 @@ const CancelListingPage = () => {
       <PageHeader
         eyebrow="Your assets"
         title="Cancel Listing"
-        description="Delist your active properties and reclaim any unsold shares. Listings with an open buyback stay locked until the claim window closes."
+        description="Delist your active assets and reclaim any unsold shares. Listings with an open buyback stay locked until the claim window closes."
         icon={
           <path
             strokeLinecap="round"
@@ -259,29 +259,29 @@ const CancelListingPage = () => {
       )}
 
       {loading ? (
-        <PropertyGridSkeleton />
-      ) : properties.length > 0 ? (
+        <AssetGridSkeleton />
+      ) : assets.length > 0 ? (
         <motion.div
           variants={stagger}
           initial="hidden"
           animate="show"
           className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3"
         >
-          {properties.map((prop) => {
-            const tokenInfo = userTokenBalances.find((tkn) => tkn.propertyId === prop.propertyId);
-            const isOwner = listingOwners[prop.propertyId]?.toLowerCase() === currentSigner?.toLowerCase();
-            const done = fractionalEvents[prop.propertyId];
-            const shares = propertyShares[prop.propertyId];
-            const locked = lockedByBuyBack[prop.propertyId];
-            const outstanding = Number(outstandingShares[prop.propertyId] || 0);
-            const buyBackDeadline = buyBackDeadlines[prop.propertyId];
-            const listingPrice = Number(listingPrices[prop.propertyId] || 0);
+          {assets.map((prop) => {
+            const tokenInfo = userTokenBalances.find((tkn) => tkn.assetId === prop.assetId);
+            const isOwner = listingOwners[prop.assetId]?.toLowerCase() === currentSigner?.toLowerCase();
+            const done = fractionalEvents[prop.assetId];
+            const shares = assetShares[prop.assetId];
+            const locked = lockedByBuyBack[prop.assetId];
+            const outstanding = Number(outstandingShares[prop.assetId] || 0);
+            const buyBackDeadline = buyBackDeadlines[prop.assetId];
+            const listingPrice = Number(listingPrices[prop.assetId] || 0);
             const minBuyBackPrice = (listingPrice * MIN_BUYBACK_MULTIPLIER).toFixed(2);
-            const buyBackPriceInput = buyBackPrices[prop.propertyId] || '';
+            const buyBackPriceInput = buyBackPrices[prop.assetId] || '';
 
             return (
-              <motion.div key={prop.propertyId} variants={rise} className="h-full">
-                <PropertyCard property={prop}>
+              <motion.div key={prop.assetId} variants={rise} className="h-full">
+                <AssetCard asset={prop}>
                   {done ? (
                     <div className="rounded-xl border border-emerald-200/70 bg-emerald-50/60 p-3.5 dark:border-emerald-900/60 dark:bg-emerald-950/30">
                       <Badge tone="success" dot>
@@ -357,7 +357,7 @@ const CancelListingPage = () => {
                                 step="0.01"
                                 value={buyBackPriceInput}
                                 onChange={(e) =>
-                                  setBuyBackPrices((prev) => ({ ...prev, [prop.propertyId]: e.target.value }))
+                                  setBuyBackPrices((prev) => ({ ...prev, [prop.assetId]: e.target.value }))
                                 }
                                 placeholder={`Min $${minBuyBackPrice}`}
                                 error={
@@ -381,11 +381,11 @@ const CancelListingPage = () => {
                           <Button
                             fullWidth
                             variant="danger"
-                            loading={busyId === prop.propertyId}
+                            loading={busyId === prop.assetId}
                             disabled={outstanding > 0 && !(Number(buyBackPriceInput) >= Number(minBuyBackPrice))}
-                            onClick={() => cancelListing(prop.propertyId, buyBackPriceInput)}
+                            onClick={() => cancelListing(prop.assetId, buyBackPriceInput)}
                           >
-                            Delist property
+                            Delist asset
                           </Button>
                           <p className="text-center text-[11px] text-slate-400 dark:text-slate-500">
                             {outstanding > 0
@@ -400,7 +400,7 @@ const CancelListingPage = () => {
                       Listed by another wallet — only the listing owner can delist.
                     </div>
                   )}
-                </PropertyCard>
+                </AssetCard>
               </motion.div>
             );
           })}
@@ -414,7 +414,7 @@ const CancelListingPage = () => {
             </Button>
           }
         >
-          Your active marketplace listings appear here once you list a fractionalized property for sale.
+          Your active marketplace listings appear here once you list a fractionalized asset for sale.
         </EmptyState>
       )}
     </AppLayout>

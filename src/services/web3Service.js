@@ -110,9 +110,9 @@ export const web3Service = {
     return new ethers.Contract(contractsConfig.vault.address, contractsConfig.vault.abi, provider);
   },
 
-  getReadOnlyPropertyNftContract: () => {
+  getReadOnlyAssetNftContract: () => {
     const provider = web3Service.getReadOnlyProvider();
-    return new ethers.Contract(contractsConfig.propertyNft.address, contractsConfig.propertyNft.abi, provider);
+    return new ethers.Contract(contractsConfig.assetNft.address, contractsConfig.assetNft.abi, provider);
   },
 
   getReadOnlyStableCoinContract: () => {
@@ -138,9 +138,9 @@ export const web3Service = {
     return new ethers.Contract(contractsConfig.vault.address, contractsConfig.vault.abi, signer);
   },
 
-  getPropertyNftContract: async () => {
+  getAssetNftContract: async () => {
     const signer = await web3Service.getSigner();
-    return new ethers.Contract(contractsConfig.propertyNft.address, contractsConfig.propertyNft.abi, signer);
+    return new ethers.Contract(contractsConfig.assetNft.address, contractsConfig.assetNft.abi, signer);
   },
 
   getStableCoinContract: async () => {
@@ -155,7 +155,7 @@ export const web3Service = {
 
   /**
    * Share token (ERC-3643) for a listing, bound to the connected signer.
-   * Each property has its own token address, so this can't be a fixed
+   * Each asset has its own token address, so this can't be a fixed
    * contract like the ones above.
    */
   getShareTokenContract: async (shareTokenAddress) => {
@@ -164,16 +164,16 @@ export const web3Service = {
   },
 
   /**
-   * Checks admin/authority permission directly against the PropertyNFT
+   * Checks admin/authority permission directly against the AssetNFT
    * contract instead of comparing to a hardcoded env address. Covers both
    * AUTHORITY_ROLE (the operational minter role) and DEFAULT_ADMIN_ROLE
    * (the AccessControl super-admin), since either should be allowed to
    * mint. Read-only, so it works even before a signer is available.
    */
-  isPropertyNftAdmin: async (address) => {
+  isAssetNftAdmin: async (address) => {
     if (!address) return false;
     try {
-      const contract = web3Service.getReadOnlyPropertyNftContract();
+      const contract = web3Service.getReadOnlyAssetNftContract();
       const [authorityRole, defaultAdminRole] = await Promise.all([
         contract.AUTHORITY_ROLE(),
         contract.DEFAULT_ADMIN_ROLE(),
@@ -184,7 +184,7 @@ export const web3Service = {
       ]);
       return hasAuthority || hasDefaultAdmin;
     } catch (err) {
-      console.error('Error checking PropertyNFT admin role:', err);
+      console.error('Error checking AssetNFT admin role:', err);
       return false;
     }
   },

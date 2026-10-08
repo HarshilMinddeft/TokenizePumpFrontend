@@ -24,12 +24,12 @@ export const isValidPriceTier = (price) => {
 };
 
 /**
- * Price tiers that divide `propertyPrice` evenly — the only base prices
- * FractionalVault.fractionalizeProperty can use, since it mints whole
- * shares only (propertyPrice / basePrice must have no remainder).
+ * Price tiers that divide `assetPrice` evenly — the only base prices
+ * FractionalVault.fractionalizeAsset can use, since it mints whole
+ * shares only (assetPrice / basePrice must have no remainder).
  */
-export const evenlyDividingTiers = (propertyPrice) => {
-  const price = Number(propertyPrice);
+export const evenlyDividingTiers = (assetPrice) => {
+  const price = Number(assetPrice);
   if (!Number.isFinite(price) || price <= 0) return [];
   return PRICE_TIERS.filter((tier) => price % tier === 0);
 };

@@ -29,16 +29,16 @@ const ArrowIcon = () => (
   </svg>
 );
 
-const imageOf = (property) => property.propertyThumbImages?.[0] || property.propertyImages?.[0];
+const imageOf = (asset) => asset.assetThumbImages?.[0] || asset.assetImages?.[0];
 
 /**
- * PropertyCard
+ * AssetCard
  * @param {boolean} [clickable] — derived automatically when `onClick` provided
  * @param {React.ReactNode} [children] action/footer content
  */
-const PropertyCard = ({ property, onClick, children, className = '', bodyClassName = '' }) => {
+const AssetCard = ({ asset, onClick, children, className = '', bodyClassName = '' }) => {
   const clickable = Boolean(onClick);
-  const image = imageOf(property);
+  const image = imageOf(asset);
 
   return (
     <Card
@@ -51,7 +51,7 @@ const PropertyCard = ({ property, onClick, children, className = '', bodyClassNa
         {image ? (
           <img
             src={image}
-            alt={property.propertyName || 'Property'}
+            alt={asset.assetName || 'Asset'}
             loading="lazy"
             className={cn(
               'h-full w-full object-cover transition-transform duration-500',
@@ -67,13 +67,13 @@ const PropertyCard = ({ property, onClick, children, className = '', bodyClassNa
 
         <div className="absolute top-3 right-3 left-3 flex items-start justify-between gap-2">
           <Badge tone="brand" className="shadow-sm backdrop-blur">
-            {property.locationDetailes ? (
+            {asset.locationDetails ? (
               <span className="flex items-center gap-1 normal-case">
                 <PinIcon />
-                <span className="max-w-32 truncate">{property.locationDetailes}</span>
+                <span className="max-w-32 truncate">{asset.locationDetails}</span>
               </span>
             ) : (
-              'Property'
+              'Asset'
             )}
           </Badge>
           {clickable && (
@@ -85,11 +85,11 @@ const PropertyCard = ({ property, onClick, children, className = '', bodyClassNa
 
         <div className="absolute bottom-3 left-3 flex items-center gap-2">
           <span className="rounded-lg bg-black/45 px-2.5 py-1 text-sm font-bold text-white backdrop-blur-sm">
-            ${formatNumber(property.propertyPrice)}
+            ${formatNumber(asset.assetPrice)}
           </span>
-          {property.propertyId !== undefined && (
+          {asset.assetId !== undefined && (
             <span className="rounded-lg bg-white/15 px-2 py-1 font-mono text-[11px] font-medium text-white backdrop-blur-sm">
-              #{property.propertyId}
+              #{asset.assetId}
             </span>
           )}
         </div>
@@ -103,13 +103,13 @@ const PropertyCard = ({ property, onClick, children, className = '', bodyClassNa
             clickable && 'group-hover:text-indigo-600 dark:group-hover:text-indigo-300',
           )}
         >
-          {property.propertyName}
+          {asset.assetName}
         </h3>
 
         <div className="mt-3 grid grid-cols-3 gap-2 border-y border-slate-100 py-3 dark:border-slate-800">
-          <Meta label="Asset value" value={`$${formatNumber(property.propertyPrice)}`} />
-          <Meta label="Size" value={property.propertySize ? `${formatNumber(property.propertySize)} sqft` : '—'} />
-          <Meta label="ID" value={`#${property.propertyId}`} mono />
+          <Meta label="Asset value" value={`$${formatNumber(asset.assetPrice)}`} />
+          <Meta label="Size" value={asset.assetSize ? `${formatNumber(asset.assetSize)} sqft` : '—'} />
+          <Meta label="ID" value={`#${asset.assetId}`} mono />
         </div>
 
         {children && <div className="mt-4 flex-1">{children}</div>}
@@ -132,4 +132,4 @@ const Meta = ({ label, value, mono = false }) => (
   </div>
 );
 
-export default PropertyCard;
+export default AssetCard;

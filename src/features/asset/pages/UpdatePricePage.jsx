@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import AppLayout from '../../../components/layout/AppLayout';
-import PropertyCard from '../components/PropertyCard';
+import AssetCard from '../components/AssetCard';
 import PageHeader from '../../../components/ui/PageHeader';
 import Button from '../../../components/ui/Button';
 import Select from '../../../components/ui/Select';
 import Spinner from '../../../components/ui/Spinner';
 import EmptyState from '../../../components/ui/EmptyState';
 import web3Service from '../../../services/web3Service';
-import propertyApi from '../api/propertyApi';
+import assetApi from '../api/assetApi';
 import useAuthorityRole from '../hooks/useAuthorityRole';
 import { useWeb3 } from '../../../context/Web3Context';
 import { getContractErrorMessage } from '../../../utils/web3Errors';
@@ -79,20 +79,20 @@ const UpdatePricePage = () => {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await propertyApi.getAllMarketplaceProperties();
-      const allProps = data.properties || [];
+      const data = await assetApi.getAllMarketplaceAssets();
+      const allProps = data.assets || [];
       const marketplace = web3Service.getReadOnlyMarketplaceContract();
 
       const active = [];
       for (const prop of allProps) {
         try {
-          const listing = await marketplace.listings(prop.propertyId);
+          const listing = await marketplace.listings(prop.assetId);
           if (!listing.active) continue;
 
           active.push({
-            property: prop,
+            asset: prop,
             listing: {
-              tokenId: prop.propertyId,
+              tokenId: prop.assetId,
               pricePerToken: formatStable(listing.pricePerToken),
               totalTokens: formatShares(listing.totalTokens),
               remainingTokens: formatShares(listing.remainingTokens),
@@ -100,7 +100,7 @@ const UpdatePricePage = () => {
             },
           });
         } catch (err) {
-          console.error(`Error reading listing ${prop.propertyId}:`, err);
+          console.error(`Error reading listing ${prop.assetId}:`, err);
         }
       }
       setRows(active);
@@ -124,13 +124,13 @@ const UpdatePricePage = () => {
 
     try {
       const marketplace = await web3Service.getMarketplaceContract();
-      const tx = await marketplace.updatePropertyPrice(tokenId, parseStable(price));
+      const tx = await marketplace.updateAssetPrice(tokenId, parseStable(price));
       await tx.wait();
 
-      toast.success('Property price updated.');
+      toast.success('Asset price updated.');
       load();
     } catch (error) {
-      console.error('Error updating property price:', error);
+      console.error('Error updating asset price:', error);
       toast.error(getContractErrorMessage(error, 'Failed to update the price. Please try again.'));
     }
   };
@@ -163,13 +163,13 @@ const UpdatePricePage = () => {
 
     return (
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {rows.map(({ property, listing }) => (
-          <PropertyCard key={listing.tokenId} property={property}>
+        {rows.map(({ asset, listing }) => (
+          <AssetCard key={listing.tokenId} asset={asset}>
             <PriceControls
               listing={listing}
               onUpdate={(price) => updatePrice(listing.tokenId, price)}
             />
-          </PropertyCard>
+          </AssetCard>
         ))}
       </div>
     );
@@ -179,7 +179,7 @@ const UpdatePricePage = () => {
     <AppLayout>
       <PageHeader
         eyebrow="Administration"
-        title="Change Property Price"
+        title="Change Asset Price"
         description="Reprice active marketplace listings. Requires the marketplace authority role."
         icon={
           <path

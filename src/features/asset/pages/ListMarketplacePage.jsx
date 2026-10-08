@@ -3,8 +3,8 @@ import { ethers } from 'ethers';
 import { toast } from 'react-toastify';
 import { motion } from 'motion/react';
 import AppLayout from '../../../components/layout/AppLayout';
-import PropertyCard from '../components/PropertyCard';
-import PropertyGridSkeleton from '../components/PropertyGridSkeleton';
+import AssetCard from '../components/AssetCard';
+import AssetGridSkeleton from '../components/AssetGridSkeleton';
 import PageHeader from '../../../components/ui/PageHeader';
 import StatCard from '../../../components/ui/StatCard';
 import Button from '../../../components/ui/Button';
@@ -13,7 +13,7 @@ import Select from '../../../components/ui/Select';
 import EmptyState from '../../../components/ui/EmptyState';
 import Badge from '../../../components/ui/Badge';
 import web3Service from '../../../services/web3Service';
-import propertyApi from '../api/propertyApi';
+import assetApi from '../api/assetApi';
 import contractsConfig from '../../../config/contracts.config';
 import { useWeb3 } from '../../../context/Web3Context';
 import { getContractErrorMessage } from '../../../utils/web3Errors';
@@ -42,7 +42,7 @@ const rise = {
 
 const ListMarketplacePage = () => {
   const { address: userAddress } = useWeb3();
-  const [properties, setProperties] = useState([]);
+  const [assets, setAssets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [fractionalEvents, setFractionalEvents] = useState({});
   const [tokensInputs, setTokenInputs] = useState({});
@@ -57,57 +57,57 @@ const ListMarketplacePage = () => {
     let balance = 0;
     for (const t of userTokenBalances) balance += Number(t.balance) || 0;
 
-    const listedCount = properties.filter((p) => existingListings[p.propertyId]).length;
+    const listedCount = assets.filter((p) => existingListings[p.assetId]).length;
 
     return { count: userTokenBalances.length, balance, listedCount };
-  }, [userTokenBalances, properties, existingListings]);
+  }, [userTokenBalances, assets, existingListings]);
 
-  const fetchProperties = async (address) => {
+  const fetchAssets = async (address) => {
     try {
-      const data = await propertyApi.getOwnerProperties(address);
-      const allProps = data.properties || [];
+      const data = await assetApi.getOwnerAssets(address);
+      const allProps = data.assets || [];
 
-      const propertyNftContract = web3Service.getReadOnlyPropertyNftContract();
+      const assetNftContract = web3Service.getReadOnlyAssetNftContract();
       const marketplaceContract = web3Service.getReadOnlyMarketplaceContract();
       const vaultContract = web3Service.getReadOnlyVaultContract();
       const filteredProps = [];
       for (const prop of allProps) {
         try {
-          const isFrac = await propertyNftContract.isFractionalized(prop.propertyId);
+          const isFrac = await assetNftContract.isFractionalized(prop.assetId);
           if (!isFrac) continue;
 
           filteredProps.push(prop);
 
           // An active listing already has a price; only a new listing lets the
-          // owner choose one, so record which case each property is in.
-          const listing = await marketplaceContract.listings(prop.propertyId);
+          // owner choose one, so record which case each asset is in.
+          const listing = await marketplaceContract.listings(prop.assetId);
           setExistingListings((prev) => ({
             ...prev,
-            [prop.propertyId]: listing.active ? formatStable(listing.pricePerToken) : null,
+            [prop.assetId]: listing.active ? formatStable(listing.pricePerToken) : null,
           }));
 
-          // listProperty reverts (BuyBackActive) while a prior buyback on this
-          // property is still open — the owner has to let holders sell back
+          // listAsset reverts (BuyBackActive) while a prior buyback on this
+          // asset is still open — the owner has to let holders sell back
           // and then call withdrawBuyBackDeposit before re-listing.
-          setBlockedByBuyBack((prev) => ({ ...prev, [prop.propertyId]: listing.buyBack }));
+          setBlockedByBuyBack((prev) => ({ ...prev, [prop.assetId]: listing.buyBack }));
 
           // The vault doesn't store the base price Fractionalize used, but
-          // propertyPrice / totalShares recovers it exactly (that's how
+          // assetPrice / totalShares recovers it exactly (that's how
           // totalShares was derived in the first place).
           if (!listing.active) {
-            const { totalShares } = await vaultContract.fractionalData(prop.propertyId);
+            const { totalShares } = await vaultContract.fractionalData(prop.assetId);
             if (!totalShares.isZero()) {
-              const basePrice = Number(prop.propertyPrice) / Number(formatShares(totalShares));
-              setFractionalizeBasePrices((prev) => ({ ...prev, [prop.propertyId]: basePrice }));
+              const basePrice = Number(prop.assetPrice) / Number(formatShares(totalShares));
+              setFractionalizeBasePrices((prev) => ({ ...prev, [prop.assetId]: basePrice }));
             }
           }
         } catch (err) {
-          console.error(`Error checking fractionalization for token ${prop.propertyId}:`, err);
+          console.error(`Error checking fractionalization for token ${prop.assetId}:`, err);
         }
       }
-      setProperties(filteredProps);
+      setAssets(filteredProps);
     } catch (err) {
-      console.error('Error fetching properties:', err);
+      console.error('Error fetching assets:', err);
     } finally {
       setLoading(false);
     }
@@ -119,15 +119,15 @@ const ListMarketplacePage = () => {
       const vaultContract = web3Service.getReadOnlyVaultContract();
       const balances = [];
 
-      for (const prop of properties) {
+      for (const prop of assets) {
         try {
-          const propertyTokenData = await vaultContract.fractionalData(prop.propertyId);
-          const propertyShareTokenAddr = propertyTokenData.tokenAddress;
+          const assetTokenData = await vaultContract.fractionalData(prop.assetId);
+          const assetShareTokenAddr = assetTokenData.tokenAddress;
 
-          if (propertyShareTokenAddr && propertyShareTokenAddr !== ethers.constants.AddressZero) {
+          if (assetShareTokenAddr && assetShareTokenAddr !== ethers.constants.AddressZero) {
             const provider = web3Service.getProvider();
             const tokenContract = new ethers.Contract(
-              propertyShareTokenAddr,
+              assetShareTokenAddr,
               ['function balanceOf(address) view returns (uint256)'],
               provider,
             );
@@ -135,14 +135,14 @@ const ListMarketplacePage = () => {
             const balance = await tokenContract.balanceOf(userAddress);
 
             balances.push({
-              propertyId: prop.propertyId,
-              propertyName: prop.propertyName,
-              tokenAddress: propertyShareTokenAddr,
+              assetId: prop.assetId,
+              assetName: prop.assetName,
+              tokenAddress: assetShareTokenAddr,
               balance: formatShares(balance),
             });
           }
         } catch (err) {
-          console.error(`Error fetching balance for property ${prop.propertyId}:`, err);
+          console.error(`Error fetching balance for asset ${prop.assetId}:`, err);
         }
       }
 
@@ -169,23 +169,23 @@ const ListMarketplacePage = () => {
       const tokensToListForProp = parseShares(inputValue);
 
       const vaultContract = await web3Service.getVaultContract();
-      const propertyToken = await vaultContract.fractionalData(tokenId);
-      const propertyShareTokenAddr = propertyToken.tokenAddress;
+      const assetToken = await vaultContract.fractionalData(tokenId);
+      const assetShareTokenAddr = assetToken.tokenAddress;
 
-      const propertyTokensTxn = await web3Service.getShareTokenContract(propertyShareTokenAddr);
+      const assetTokensTxn = await web3Service.getShareTokenContract(assetShareTokenAddr);
 
       const marketplaceContract = await web3Service.getMarketplaceContract();
       const checkListingData = await marketplaceContract.listings(tokenId);
       const checkListing = checkListingData.active;
 
-      const approveTx = await propertyTokensTxn.approve(contractsConfig.marketplace.address, tokensToListForProp);
+      const approveTx = await assetTokensTxn.approve(contractsConfig.marketplace.address, tokensToListForProp);
       await approveTx.wait();
 
       if (!checkListing) {
-        // listProperty takes the share token itself (not the tokenId) and the
+        // listAsset takes the share token itself (not the tokenId) and the
         // opening price; the marketplace derives the tokenId from the token.
-        const listTx = await marketplaceContract.listProperty(
-          propertyShareTokenAddr,
+        const listTx = await marketplaceContract.listAsset(
+          assetShareTokenAddr,
           tokensToListForProp,
           parseStable(listingPrice),
         );
@@ -197,7 +197,7 @@ const ListMarketplacePage = () => {
 
       const afterListingData = await marketplaceContract.listings(tokenId);
       const listingInfo = {
-        shareToken: afterListingData.propertyToken,
+        shareToken: afterListingData.assetToken,
         totalShares: formatShares(afterListingData.totalTokens),
         pricePerToken: formatStable(afterListingData.pricePerToken),
         remainingTokens: formatShares(afterListingData.remainingTokens),
@@ -229,21 +229,21 @@ const ListMarketplacePage = () => {
 
   useEffect(() => {
     if (userAddress) {
-      fetchProperties(userAddress);
+      fetchAssets(userAddress);
     } else {
       setLoading(false);
     }
   }, [userAddress]);
 
   useEffect(() => {
-    if (properties.length > 0 && userAddress) {
+    if (assets.length > 0 && userAddress) {
       fetchUserTokenBalance();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [properties, userAddress]);
+  }, [assets, userAddress]);
 
   const balanceFor = (id) => {
-    const found = userTokenBalances.find((b) => b.propertyId === id);
+    const found = userTokenBalances.find((b) => b.assetId === id);
     return found ? found.balance : '0';
   };
 
@@ -252,7 +252,7 @@ const ListMarketplacePage = () => {
       <PageHeader
         eyebrow="Your assets"
         title="List to Marketplace"
-        description="Put your fractional shares up for sale. Price per share defaults to what the property was fractionalized at, and buyers pay with USDC."
+        description="Put your fractional shares up for sale. Price per share defaults to what the asset was fractionalized at, and buyers pay with USDC."
         icon={
           <path
             strokeLinecap="round"
@@ -266,7 +266,7 @@ const ListMarketplacePage = () => {
         <div className="mb-8 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
           <StatCard
             label="Fractionalized assets"
-            value={formatNumber(properties.length, 0)}
+            value={formatNumber(assets.length, 0)}
             tone="brand"
             icon={<ListIcon />}
           />
@@ -279,8 +279,8 @@ const ListMarketplacePage = () => {
           />
           <StatCard
             label="Already listed"
-            value={`${formatNumber(totals.listedCount, 0)} / ${formatNumber(properties.length, 0)}`}
-            sub="properties live on the marketplace"
+            value={`${formatNumber(totals.listedCount, 0)} / ${formatNumber(assets.length, 0)}`}
+            sub="assets live on the marketplace"
             tone="warning"
             icon={<PriceIcon />}
           />
@@ -288,34 +288,34 @@ const ListMarketplacePage = () => {
       )}
 
       {loading ? (
-        <PropertyGridSkeleton />
-      ) : properties.length > 0 ? (
+        <AssetGridSkeleton />
+      ) : assets.length > 0 ? (
         <motion.div
           variants={stagger}
           initial="hidden"
           animate="show"
           className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3"
         >
-          {properties.map((prop) => {
-            const availableBalance = balanceFor(prop.propertyId);
-            const listingDone = fractionalEvents[prop.propertyId];
-            const listedPrice = existingListings[prop.propertyId];
-            const blocked = blockedByBuyBack[prop.propertyId];
+          {assets.map((prop) => {
+            const availableBalance = balanceFor(prop.assetId);
+            const listingDone = fractionalEvents[prop.assetId];
+            const listedPrice = existingListings[prop.assetId];
+            const blocked = blockedByBuyBack[prop.assetId];
 
-            // Default the dropdown to the price per share this property was
+            // Default the dropdown to the price per share this asset was
             // fractionalized at, snapped to the nearest offered tier — the
             // owner can still pick a different tier before listing.
-            const basePrice = fractionalizeBasePrices[prop.propertyId];
+            const basePrice = fractionalizeBasePrices[prop.assetId];
             const defaultPrice = basePrice
               ? PRICE_TIERS.reduce((closest, tier) =>
                   Math.abs(tier - basePrice) < Math.abs(closest - basePrice) ? tier : closest,
                 )
               : DEFAULT_LISTING_PRICE;
-            const selectedPrice = priceInputs[prop.propertyId] ?? defaultPrice;
+            const selectedPrice = priceInputs[prop.assetId] ?? defaultPrice;
 
             return (
-              <motion.div key={prop.propertyId} variants={rise} className="h-full">
-                <PropertyCard property={prop}>
+              <motion.div key={prop.assetId} variants={rise} className="h-full">
+                <AssetCard asset={prop}>
                   {listingDone ? (
                     <div className="rounded-xl border border-emerald-200/70 bg-emerald-50/60 p-3.5 dark:border-emerald-900/60 dark:bg-emerald-950/30">
                       <div className="mb-2 flex items-center justify-between">
@@ -340,7 +340,7 @@ const ListMarketplacePage = () => {
                   ) : blocked ? (
                     <div className="space-y-2 rounded-xl bg-amber-50 px-3.5 py-3 text-[12.5px] leading-relaxed text-amber-800 dark:bg-amber-950/20 dark:text-amber-300">
                       <p>
-                        A buyback from this property&apos;s last listing is still open. It has to be withdrawn before
+                        A buyback from this asset&apos;s last listing is still open. It has to be withdrawn before
                         you can list again.
                       </p>
                       <Button
@@ -365,8 +365,8 @@ const ListMarketplacePage = () => {
                         type="number"
                         min="0"
                         placeholder="e.g. 500"
-                        value={tokensInputs[prop.propertyId] || ''}
-                        onChange={(e) => handleInputChange(prop.propertyId, e.target.value)}
+                        value={tokensInputs[prop.assetId] || ''}
+                        onChange={(e) => handleInputChange(prop.assetId, e.target.value)}
                         hint={
                           Number(availableBalance) > 0
                             ? `Available: ${formatNumber(availableBalance)} tokens`
@@ -383,7 +383,7 @@ const ListMarketplacePage = () => {
                         <Select
                           label="Price per share"
                           value={selectedPrice}
-                          onChange={(e) => setPriceInputs((prev) => ({ ...prev, [prop.propertyId]: e.target.value }))}
+                          onChange={(e) => setPriceInputs((prev) => ({ ...prev, [prop.assetId]: e.target.value }))}
                         >
                           {PRICE_TIERS.map((tier) => (
                             <option key={tier} value={tier}>
@@ -395,8 +395,8 @@ const ListMarketplacePage = () => {
                       <Button
                         fullWidth
                         disabled={Number(availableBalance) <= 0}
-                        loading={busyId === prop.propertyId}
-                        onClick={() => listToMarketplace(prop.propertyId, selectedPrice)}
+                        loading={busyId === prop.assetId}
+                        onClick={() => listToMarketplace(prop.assetId, selectedPrice)}
                       >
                         {listedPrice ? 'Add to listing' : `List at $${selectedPrice}/token`}
                       </Button>
@@ -405,7 +405,7 @@ const ListMarketplacePage = () => {
                       </p>
                     </div>
                   )}
-                </PropertyCard>
+                </AssetCard>
               </motion.div>
             );
           })}
@@ -414,12 +414,12 @@ const ListMarketplacePage = () => {
         <EmptyState
           title="No fractionalized assets found"
           action={
-            <Button variant="soft" size="sm" onClick={() => (window.location.href = '/fractionalize-property')}>
-              Fractionalize a property
+            <Button variant="soft" size="sm" onClick={() => (window.location.href = '/fractionalize-asset')}>
+              Fractionalize an asset
             </Button>
           }
         >
-          Properties appear here once they are fractionalized and owned by your connected wallet.
+          Assets appear here once they are fractionalized and owned by your connected wallet.
         </EmptyState>
       )}
     </AppLayout>
