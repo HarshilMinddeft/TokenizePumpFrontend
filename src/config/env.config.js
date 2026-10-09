@@ -27,6 +27,7 @@ export const envConfig = {
   stableCoinAddress: import.meta.env.VITE_STABLECOIN_CONTRACT_ADDRESS,
   orderBookAddress: import.meta.env.VITE_ORDERBOOK_CONTRACT_ADDRESS,
   identityRegistryAddress: import.meta.env.VITE_IDENTITY_REGISTRY_CONTRACT_ADDRESS,
+  rentDistributorAddress: import.meta.env.VITE_RENT_DISTRIBUTOR_CONTRACT_ADDRESS,
 
   // Admin Account
   adminWalletAddress: (import.meta.env.VITE_ADMIN_WALLET_ADDRESS || '').toLowerCase(),

@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { cn } from '../../lib/utils';
 
@@ -9,7 +10,14 @@ import { cn } from '../../lib/utils';
  * @param {string} [title]
  * @param {string} [description]
  */
-const Dialog = ({ open, onClose, title, description, children, className = '', footer }) => {
+const WIDTHS = {
+  md: 'max-w-md',
+  lg: 'max-w-2xl',
+  xl: 'max-w-5xl',
+};
+
+/** @param {'md'|'lg'|'xl'} [size] dialog width (default md) */
+const Dialog = ({ open, onClose, title, description, children, className = '', footer, size = 'md' }) => {
   useEffect(() => {
     if (!open) return undefined;
     const onKey = (e) => {
@@ -23,7 +31,10 @@ const Dialog = ({ open, onClose, title, description, children, className = '', f
     };
   }, [open, onClose]);
 
-  return (
+  // Rendered into document.body: a `fixed` overlay inside any transformed
+  // ancestor (e.g. motion's entrance animations) is positioned against that
+  // ancestor instead of the viewport, which pushed dialogs off-screen.
+  return createPortal(
     <AnimatePresence>
       {open && (
         <motion.div
@@ -45,7 +56,8 @@ const Dialog = ({ open, onClose, title, description, children, className = '', f
             exit={{ opacity: 0, scale: 0.96, y: 8 }}
             transition={{ type: 'spring', stiffness: 380, damping: 30 }}
             className={cn(
-              'w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl outline-none dark:border-slate-700 dark:bg-slate-900',
+              'w-full rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl outline-none dark:border-slate-700 dark:bg-slate-900',
+              WIDTHS[size] ?? WIDTHS.md,
               className,
             )}
           >
@@ -74,7 +86,8 @@ const Dialog = ({ open, onClose, title, description, children, className = '', f
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 };
 

@@ -38,6 +38,32 @@ export const evenlyDividingTiers = (assetPrice) => {
 export const parseShares = (amount) =>
   ethers.utils.parseUnits(String(amount), SHARE_DECIMALS);
 
+/** What to tell a user who typed something that isn't a whole share count. */
+export const WHOLE_SHARES_MESSAGE = 'Shares are whole units — enter a whole number of shares, e.g. 5.';
+
+/**
+ * UI share amount -> on-chain BigNumber, or null when it isn't a positive
+ * whole number. Shares have no decimals, so "1.5" or "1e3" must be rejected
+ * up front instead of failing inside parseUnits.
+ */
+export const parseWholeShares = (amount) => {
+  const text = String(amount ?? '').trim();
+  if (!/^\d+$/.test(text)) return null;
+  const shares = ethers.BigNumber.from(text);
+  return shares.isZero() ? null : shares;
+};
+
+/**
+ * UI price -> stablecoin units, or null when it isn't a positive amount with
+ * at most STABLECOIN_DECIMALS decimals.
+ */
+export const parseStablePrice = (amount) => {
+  const text = String(amount ?? '').trim();
+  if (!new RegExp(`^\\d+(\\.\\d{1,${STABLECOIN_DECIMALS}})?$`).test(text)) return null;
+  const value = ethers.utils.parseUnits(text, STABLECOIN_DECIMALS);
+  return value.isZero() ? null : value;
+};
+
 /** On-chain share amount -> display string. */
 export const formatShares = (amount) =>
   ethers.utils.formatUnits(amount, SHARE_DECIMALS);

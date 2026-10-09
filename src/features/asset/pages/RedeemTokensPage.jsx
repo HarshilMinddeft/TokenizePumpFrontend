@@ -3,13 +3,12 @@ import { ethers } from 'ethers';
 import { toast } from 'react-toastify';
 import { motion } from 'motion/react';
 import AppLayout from '../../../components/layout/AppLayout';
-import AssetCard from '../components/AssetCard';
+import RedeemConsole from '../components/RedeemConsole';
 import AssetGridSkeleton from '../components/AssetGridSkeleton';
 import PageHeader from '../../../components/ui/PageHeader';
 import StatCard from '../../../components/ui/StatCard';
 import Button from '../../../components/ui/Button';
 import EmptyState from '../../../components/ui/EmptyState';
-import Badge from '../../../components/ui/Badge';
 import web3Service from '../../../services/web3Service';
 import assetApi from '../api/assetApi';
 import contractsConfig from '../../../config/contracts.config';
@@ -17,7 +16,7 @@ import { ROUTES } from '../../../config/routes';
 import { useWeb3 } from '../../../context/Web3Context';
 import { getContractErrorMessage } from '../../../utils/web3Errors';
 import { formatShares } from '../../../utils/units';
-import { expectedShares, formatNumber, formatUsd, shortenAddress } from '../../../lib/utils';
+import { formatNumber, formatUsd } from '../../../lib/utils';
 
 const stagger = {
   hidden: {},
@@ -33,18 +32,21 @@ const RedeemTokensPage = () => {
   const [assets, setAssets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [fractionalEvents, setFractionalEvents] = useState({});
-  const [ownerBalances, setOwnerBalances] = useState({});
-  const [busyId, setBusyId] = useState(null);
+  // tokenId → { shareToken, supply, balance, holdsAll } read from chain
+  const [shareInfo, setShareInfo] = useState({});
+  // tokenId → 'approve' | 'burn' | 'unbind' while that step runs
+  const [stages, setStages] = useState({});
+  const setStage = (id, stage) => setStages((prev) => ({ ...prev, [id]: stage }));
 
   const totals = useMemo(() => {
     let value = 0;
     let shares = 0;
     for (const p of assets) {
       value += Number(p.assetPrice) || 0;
-      shares += expectedShares(p.assetPrice);
+      shares += Number(shareInfo[p.assetId]?.balance ?? 0);
     }
     return { value, shares };
-  }, [assets]);
+  }, [assets, shareInfo]);
 
   const fetchAssets = async (address) => {
     try {
@@ -55,26 +57,46 @@ const RedeemTokensPage = () => {
       const marketplaceContract = web3Service.getReadOnlyMarketplaceContract();
       const vaultContract = web3Service.getReadOnlyVaultContract();
       const filteredProps = [];
+      const info = {};
       for (const prop of allProps) {
         try {
           const isFrac = await assetNftContract.isFractionalized(prop.assetId);
           if (!isFrac) continue;
 
-          // redeemShares now only requires marketplace.wasCancelled(tokenId)
-          // (set by cancelListing) plus holding your own balance — not 100%
-          // of supply, since any shares still out after a buyback window
-          // closes are simply forfeited by their holders, not blocking.
-          const wasCancelled = await marketplaceContract.wasCancelled(prop.assetId);
-          if (!wasCancelled) continue;
-
           const fracData = await vaultContract.fractionalData(prop.assetId);
           if (fracData.redeemed) continue;
 
+          // redeemShares allows either:
+          //  - you hold every share (never listed, or nothing sold/listed
+          //    away) — nobody else to protect, redeem straight away; or
+          //  - the listing was cancelled (cancelListing → buyback), in which
+          //    case your own balance is enough.
+          const shareToken = new ethers.Contract(
+            fracData.tokenAddress,
+            contractsConfig.shareToken.abi,
+            web3Service.getReadOnlyProvider(),
+          );
+          const [balance, supply, symbol] = await Promise.all([
+            shareToken.balanceOf(address),
+            shareToken.totalSupply(),
+            shareToken.symbol().catch(() => ''),
+          ]);
+          const holdsAllShares = !balance.isZero() && balance.eq(supply);
+          if (!holdsAllShares && !(await marketplaceContract.wasCancelled(prop.assetId))) continue;
+
+          info[prop.assetId] = {
+            shareToken: fracData.tokenAddress,
+            symbol,
+            supply: formatShares(supply),
+            balance: formatShares(balance),
+            holdsAll: holdsAllShares,
+          };
           filteredProps.push(prop);
         } catch (err) {
           console.error(`Error checking asset ${prop.assetId}:`, err);
         }
       }
+      setShareInfo(info);
       setAssets(filteredProps);
     } catch (err) {
       console.error('Error fetching assets:', err);
@@ -84,7 +106,7 @@ const RedeemTokensPage = () => {
   };
 
   const redeemTokens = async (tokenId, complianceAddress) => {
-    setBusyId(tokenId);
+    setStage(tokenId, 'approve');
     try {
       const signer = await web3Service.getSigner();
       const vaultContract = await web3Service.getVaultContract();
@@ -102,30 +124,28 @@ const RedeemTokensPage = () => {
       const approveTx = await assetTokensTxn.approve(contractsConfig.vault.address, ownerBalance);
       await approveTx.wait();
 
+      setStage(tokenId, 'burn');
       const vaultTx = await vaultContract.redeemShares(tokenId);
       await vaultTx.wait();
 
+      setStage(tokenId, 'unbind');
       const unbindTokenContract = new ethers.Contract(complianceAddress, contractsConfig.compliance.abi, signer);
 
       const unbindTx = await unbindTokenContract.unbindToken(assetShareTokenAddr);
       await unbindTx.wait();
 
-      const afterData = await vaultContract.fractionalData(tokenId);
+      const burned = Number(formatShares(ownerBalance));
+      const supplyBefore = Number(shareInfo[tokenId]?.supply ?? burned);
       setFractionalEvents((prev) => ({
         ...prev,
-        [tokenId]: {
-          shareToken: afterData.tokenAddress,
-          totalShares: afterData.totalShares.toString(),
-          originalOwner: afterData.originalOwner,
-          compAddress: afterData.complianceAddress,
-        },
+        [tokenId]: { burned, othersKeep: Math.max(0, supplyBefore - burned) },
       }));
-      toast.success('Asset tokens redeemed successfully.');
+      toast.success(`Station NFT #${tokenId} is back in your wallet.`);
     } catch (error) {
       console.error('Error redeeming asset tokens:', error);
       toast.error(getContractErrorMessage(error, 'Redemption failed. Please try again.'));
     } finally {
-      setBusyId(null);
+      setStage(tokenId, null);
     }
   };
 
@@ -137,38 +157,12 @@ const RedeemTokensPage = () => {
     }
   }, [address]);
 
-  useEffect(() => {
-    if (!address || assets.length === 0) return;
-    let cancelled = false;
-
-    (async () => {
-      const vaultContract = web3Service.getReadOnlyVaultContract();
-      const provider = web3Service.getProvider();
-      const balances = {};
-      for (const prop of assets) {
-        try {
-          const fracData = await vaultContract.fractionalData(prop.assetId);
-          const tokenContract = new ethers.Contract(fracData.tokenAddress, contractsConfig.shareToken.abi, provider);
-          const balance = await tokenContract.balanceOf(address);
-          balances[prop.assetId] = formatShares(balance);
-        } catch (err) {
-          console.error(`Error fetching share balance for asset ${prop.assetId}:`, err);
-        }
-      }
-      if (!cancelled) setOwnerBalances(balances);
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [address, assets]);
-
   return (
     <AppLayout>
       <PageHeader
         eyebrow="Your assets"
-        title="Redeem Asset"
-        description="Once a listing is cancelled (and any buyback window has run its course), redeem your shares to unbind the compliance contract and reclaim full ownership of the underlying asset."
+        title="Reclaim a Station"
+        description="Take your station back. If you still hold every share (for example you never listed), you can redeem right away. If investors hold shares, cancel the listing first so they can sell back to you — then redeem to burn your shares and reclaim the station NFT."
         icon={
           <path
             strokeLinecap="round"
@@ -181,22 +175,22 @@ const RedeemTokensPage = () => {
       {!loading && (
         <div className="mb-8 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
           <StatCard
-            label="Redeemable assets"
+            label="Stations to reclaim"
             value={formatNumber(assets.length, 0)}
             tone="brand"
             icon={<RedeemIcon />}
           />
           <StatCard
-            label="Shares you must hold"
+            label="Shares to burn"
             value={formatNumber(totals.shares, 0)}
-            sub="to burn for full ownership"
+            sub="your balance across these stations"
             tone="success"
             icon={<CoinsIcon />}
           />
           <StatCard
-            label="Asset value recovered"
+            label="Station value reclaimed"
             value={formatUsd(totals.value, 0)}
-            sub="when redemption completes"
+            sub="NFTs back in your wallet"
             tone="warning"
             icon={<TrendIcon />}
           />
@@ -206,72 +200,32 @@ const RedeemTokensPage = () => {
       {loading ? (
         <AssetGridSkeleton />
       ) : assets.length > 0 ? (
-        <motion.div variants={stagger} initial="hidden" animate="show" className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
-          {assets.map((prop) => {
-            const done = fractionalEvents[prop.assetId];
+        <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-6">
+          {assets.map((station) => {
             return (
-              <motion.div key={prop.assetId} variants={rise} className="h-full">
-                <AssetCard asset={prop}>
-                  {done ? (
-                    <div className="rounded-xl border border-emerald-200/70 bg-emerald-50/60 p-3.5 dark:border-emerald-900/60 dark:bg-emerald-950/30">
-                      <Badge tone="success" dot>
-                        All tokens redeemed
-                      </Badge>
-                      {done.compAddress && done.compAddress !== ethers.constants.AddressZero && (
-                        <p className="mt-2 truncate font-mono text-[11px] text-emerald-700/80 dark:text-emerald-300/70">
-                          {shortenAddress(done.compAddress, 10, 6)}
-                        </p>
-                      )}
-                      <p className="mt-2 text-xs leading-relaxed text-emerald-800/80 dark:text-emerald-200/70">
-                        The compliance contract was unbound — ownership of the asset is back with the original holder.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      <div className="space-y-1.5 rounded-xl bg-slate-50 px-3.5 py-2.5 text-[13px] dark:bg-slate-950/50">
-                        <div className="flex items-center justify-between">
-                          <span className="text-slate-400 dark:text-slate-500">Your share balance</span>
-                          <span className="font-bold text-slate-700 tabular-nums dark:text-slate-200">
-                            {formatNumber(ownerBalances[prop.assetId] ?? 0)} tokens
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-slate-400 dark:text-slate-500">Listing</span>
-                          <span className="font-bold text-emerald-600 tabular-nums dark:text-emerald-400">
-                            Cancelled — ready to redeem
-                          </span>
-                        </div>
-                      </div>
-                      <Button
-                        fullWidth
-                        loading={busyId === prop.assetId}
-                        disabled={!(Number(ownerBalances[prop.assetId]) > 0)}
-                        onClick={() => redeemTokens(prop.assetId, prop.complianceAddress)}
-                      >
-                        Redeem & reclaim asset
-                      </Button>
-                      <p className="text-center text-[11px] text-slate-400 dark:text-slate-500">
-                        Burns your share balance and unbinds compliance — any shares other holders never sold back
-                        stay with them
-                      </p>
-                    </div>
-                  )}
-                </AssetCard>
+              <motion.div key={station.assetId} variants={rise}>
+                <RedeemConsole
+                  asset={station}
+                  info={shareInfo[station.assetId]}
+                  stage={stages[station.assetId]}
+                  done={fractionalEvents[station.assetId]}
+                  onRedeem={() => redeemTokens(station.assetId, station.complianceAddress)}
+                />
               </motion.div>
             );
           })}
         </motion.div>
       ) : (
         <EmptyState
-          title="Nothing to redeem right now"
+          title="No stations to reclaim right now"
           action={
-            <Button variant="soft" size="sm" onClick={() => (window.location.href = ROUTES.appMarketplace)}>
-              Browse the marketplace
+            <Button variant="soft" size="sm" onClick={() => (window.location.href = ROUTES.cancelListing)}>
+              Go to Cancel Listing
             </Button>
           }
         >
-          Assets appear here when they are fully fractionalized and not actively listed. Make sure the required
-          share supply is held by your wallet.
+          A fractionalized station appears here when you hold all of its shares, or once its listing has been
+          cancelled so investors could sell back to you.
         </EmptyState>
       )}
     </AppLayout>

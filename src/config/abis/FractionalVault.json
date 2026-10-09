@@ -375,7 +375,7 @@
         },
         {
           "internalType": "uint256",
-          "name": "_basePrice",
+          "name": "_sliceValue",
           "type": "uint256"
         }
       ],

@@ -17,6 +17,10 @@ import { useZodForm } from '../../../hooks/useZodForm';
 import { tokenizeAssetSchema, parseLeadingNumber } from '../schemas/assetSchema';
 import { evenlyDividingTiers, PRICE_STEP } from '../../../utils/units';
 import { formatUsd, shortenAddress } from '../../../lib/utils';
+import { DEFAULT_STREAM_SETTINGS, LAND_MODELS, streamLabel } from '../../../config/incomeStreams';
+import StreamPicker from '../../rent/components/StreamPicker';
+import useAssetRegistration from '../hooks/useAssetRegistration';
+import { MintedIdentifiers, RegistrationRecovery } from '../components/RegistrationPanels';
 
 /* ------------------------------------------------------------------ */
 /* Pieces                                                               */
@@ -123,8 +127,8 @@ const FilePicker = ({ kind = 'file', preview, fileName, meta, description, accep
 /**
  * Live check on whether the entered asset price can later be split into
  * whole shares at Fractionalize time. FractionalVault mints
- * assetPrice / basePrice shares with no remainder allowed
- * (SHARE_DECIMALS == 0), and basePrice is offered in $10 steps there — so a
+ * assetPrice / sliceValue shares with no remainder allowed
+ * (SHARE_DECIMALS == 0), and sliceValue is offered in $10 steps there — so a
  * price with no evenly-dividing $10 tier can never be fractionalized. Flags
  * that at entry time rather than letting it surface as a dead end later.
  */
@@ -136,13 +140,13 @@ const getPriceDivisibilityHint = (rawValue) => {
   if (validTiers.length === 0) {
     return {
       tone: 'negative',
-      text: `No $${PRICE_STEP}-multiple price per share divides $${price} evenly — this asset won't be fractionalizable later. Choose a price that's a multiple of $${PRICE_STEP}.`,
+      text: `No $${PRICE_STEP}-multiple slice size divides $${price} evenly — this asset won't be fractionalizable later. Choose a value that's a multiple of $${PRICE_STEP}.`,
     };
   }
 
   return {
     tone: 'positive',
-    text: `Divisible at $${validTiers.join(', $')} per share once fractionalized.`,
+    text: `Can be sliced into shares worth $${validTiers.join(', $')} each when fractionalized.`,
   };
 };
 
@@ -165,7 +169,6 @@ const TokenizeAssetPage = () => {
   const [multipleImages, setMultipleImages] = useState([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [pdfFile, setPdfFile] = useState(null);
-  const [propUploadStatus, setProUploadStatus] = useState('');
   const [uploadStatus, setUploadStatus] = useState('');
   const [busy, setBusy] = useState(false);
   // Index into FLOW_STEPS for the step currently in flight — -1 before
@@ -185,6 +188,9 @@ const TokenizeAssetPage = () => {
     management: '',
     location: '',
   });
+
+  // Land model + which income streams are shared with holders (see StreamPicker).
+  const [streamSettings, setStreamSettings] = useState(DEFAULT_STREAM_SETTINGS);
 
   const { errors, validate, clearError } = useZodForm(tokenizeAssetSchema);
 
@@ -234,10 +240,27 @@ const TokenizeAssetPage = () => {
     return data.url || `${envConfig.ipfsGateway}${data.IpfsHash}`;
   };
 
+  // Last step (gallery + PDF + saving the asset in the backend). Separate from
+  // the on-chain steps so its failure is never shown as success and can be
+  // retried without minting again.
+  const registration = useAssetRegistration({ uploadFile: uploadToPinata, addAsset: assetApi.addAsset });
+  const working = busy || registration.busy;
+
+  const announce = (result) => {
+    if (result === 'registered') toast.success('Asset registered successfully.');
+    else if (result === 'already') toast.info('This asset was already registered.');
+    else toast.error('The NFT is minted, but registering it didn’t finish — use “Retry registration”.');
+  };
+
+  const retryRegistration = async () => {
+    setCurrentStep(4);
+    announce(await registration.retry());
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const { success, data } = validate({ ...formData, singleImage });
+    const { success, data } = validate({ ...formData, ...streamSettings, singleImage });
     if (!success) {
       toast.error('Please fix the highlighted fields.');
       return;
@@ -250,114 +273,81 @@ const TokenizeAssetPage = () => {
     setCurrentStep(0);
     setUploadStatus('Uploading to IPFS…');
 
+    // ── On-chain steps: image + metadata → compliance contract → ownership → mint
+    let mintInfo = null;
     try {
-      let tokenpId = '';
-      let singleImageUrl = '';
-      let complianceAddress = '';
+      setUploadStatus('Uploading primary image to IPFS…');
+      const singleImageUrl = await uploadToPinata(singleImage);
 
-      if (singleImage) {
-        setUploadStatus('Uploading primary image to IPFS…');
-        singleImageUrl = await uploadToPinata(singleImage);
-
-        const metadata = {
-          description: formData.details,
-          external_url: 'https://openseacreatures.io/3',
-          image: singleImageUrl,
-          name: formData.name,
-          attributes: [
-            {
-              trait_type: 'PDF',
-              value: 'Doc',
-            },
-          ],
-        };
-
-        setUploadStatus('Publishing NFT metadata…');
-        const metadataData = await assetApi.uploadMetadata(metadata);
-        const metadataUrl = `${envConfig.publicIpfsGateway}${metadataData.IpfsHash}`;
-
-        const signer = await web3Service.getSigner();
-
-        const complianceFactory = new ethers.ContractFactory(
-          contractsConfig.compliance.abi,
-          contractsConfig.compliance.bytecode,
-          signer,
-        );
-        setCurrentStep(1);
-        setUploadStatus('Deploying compliance contract…');
-        const complianceContract = await complianceFactory.deploy();
-        await complianceContract.deployed();
-
-        complianceAddress = complianceContract.address;
-
-        setUploadStatus('Initializing compliance contract…');
-        const initTx = await complianceContract.init();
-        await initTx.wait();
-
-        const complianceCont = new ethers.Contract(complianceAddress, contractsConfig.compliance.abi, signer);
-        setCurrentStep(2);
-        setUploadStatus('Transferring ownership to the asset owner…');
-        const changeOwnerCompliance = await complianceCont.transferOwnership(formData.assetOwnerWallet);
-        await changeOwnerCompliance.wait();
-
-        const assetNftContract = await web3Service.getAssetNftContract();
-        setCurrentStep(3);
-        setUploadStatus('Minting the asset NFT…');
-        const transaction = await assetNftContract.mintAsset(
-          formData.name,
-          formData.name,
-          formData.assetOwnerWallet,
-          metadataUrl,
-          formData.location,
-          assetSize,
-          assetPrice,
-        );
-
-        const receipt = await transaction.wait();
-        const mintedEvent = receipt.events.find((event) => event.event === 'AssetMinted');
-        const tokenId = mintedEvent.args.tokenId.toString();
-        tokenpId = tokenId;
-        const recipient = mintedEvent.args.recipient;
-
-        setProUploadStatus(
-          `NFT Minted!\nAsset NFT ID: ${tokenId}\nOwner Address: ${recipient}\nNft Address: ${contractsConfig.assetNft.address}`,
-        );
-      }
-
-      setCurrentStep(4);
-      setUploadStatus('');
-      const multiImageUrls = [];
-      for (const file of multipleImages) {
-        const url = await uploadToPinata(file);
-        multiImageUrls.push(url);
-      }
-
-      let pdfUrl = '';
-      if (pdfFile) pdfUrl = await uploadToPinata(pdfFile);
-
-      setUploadStatus('Registering the asset…');
-      const finalPayload = {
-        assetId: tokenpId,
-        assetName: formData.name,
-        assetPrice: formData.assetPrice,
-        assetSize: formData.assetSize,
-        assetOwnerWallet: formData.assetOwnerWallet,
-        assetFeatures: formData.features,
-        offeringDetails: formData.offering,
-        assetDetails: formData.details,
-        assetManagement: formData.management,
-        locationDetails: formData.location,
-        assetDocuments: [pdfUrl],
-        assetImages: multiImageUrls,
-        assetThumbImages: [singleImageUrl],
-        complianceAddress: complianceAddress,
-        active: true,
+      // Standard ERC-721 metadata (name / description / image / attributes),
+      // shaped like Lien-fi's so wallets and explorers show the station's
+      // key facts as traits.
+      const metadata = {
+        name: formData.name.trim(),
+        description: formData.details.trim(),
+        image: singleImageUrl,
+        attributes: [
+          { trait_type: 'Asset Type', value: 'Fuel Station' },
+          { trait_type: 'Location', value: formData.location.trim() },
+          { trait_type: 'Asset Value (USD)', value: assetPrice, display_type: 'number' },
+          { trait_type: 'Site Area (sqft)', value: assetSize, display_type: 'number' },
+          { trait_type: 'Land', value: LAND_MODELS[data.landModel]?.short ?? data.landModel },
+          ...data.incomeStreams.map((key) => ({ trait_type: 'Income Stream', value: streamLabel(key) })),
+        ],
       };
 
-      await assetApi.addAsset(finalPayload);
+      setUploadStatus('Publishing NFT metadata…');
+      const metadataData = await assetApi.uploadMetadata(metadata);
+      // Same gateway as the image (the backend's Pinata gateway): it's the
+      // one wallets can reliably fetch — the public ipfs.io gateway is
+      // blocked on some networks, leaving wallets with a blank NFT.
+      const metadataUrl = metadataData.url || `${envConfig.publicIpfsGateway}${metadataData.IpfsHash}`;
 
-      setUploadStatus('');
-      toast.success('Process Completed successfully.');
+      const signer = await web3Service.getSigner();
+
+      const complianceFactory = new ethers.ContractFactory(
+        contractsConfig.compliance.abi,
+        contractsConfig.compliance.bytecode,
+        signer,
+      );
+      setCurrentStep(1);
+      setUploadStatus('Deploying compliance contract…');
+      const complianceContract = await complianceFactory.deploy();
+      await complianceContract.deployed();
+
+      const complianceAddress = complianceContract.address;
+
+      setUploadStatus('Initializing compliance contract…');
+      const initTx = await complianceContract.init();
+      await initTx.wait();
+
+      const complianceCont = new ethers.Contract(complianceAddress, contractsConfig.compliance.abi, signer);
+      setCurrentStep(2);
+      setUploadStatus('Transferring ownership to the asset owner…');
+      const changeOwnerCompliance = await complianceCont.transferOwnership(formData.assetOwnerWallet);
+      await changeOwnerCompliance.wait();
+
+      const assetNftContract = await web3Service.getAssetNftContract();
+      setCurrentStep(3);
+      setUploadStatus('Minting the asset NFT…');
+      const transaction = await assetNftContract.mintAsset(
+        formData.name,
+        formData.name,
+        formData.assetOwnerWallet,
+        metadataUrl,
+        formData.location,
+        assetSize,
+        assetPrice,
+      );
+
+      const receipt = await transaction.wait();
+      const mintedEvent = receipt.events.find((event) => event.event === 'AssetMinted');
+      mintInfo = {
+        tokenId: mintedEvent.args.tokenId.toString(),
+        owner: mintedEvent.args.recipient,
+        complianceAddress,
+        singleImageUrl,
+      };
     } catch (err) {
       console.error(err);
       setUploadStatus('');
@@ -371,9 +361,39 @@ const TokenizeAssetPage = () => {
           toast.error('Please try after some time');
         }
       }
-    } finally {
       setBusy(false);
+      return;
     }
+
+    // ── The NFT exists. Registering it with VARELO is its own step: if it
+    // fails the screen says so and offers a retry — it is never shown as done.
+    setCurrentStep(4);
+    setUploadStatus('');
+    const result = await registration.finish(mintInfo, {
+      galleryFiles: multipleImages,
+      pdfFile,
+      buildPayload: ({ tokenId, complianceAddress, singleImageUrl, gallery, pdf }) => ({
+        assetId: tokenId,
+        assetName: formData.name,
+        assetPrice: formData.assetPrice,
+        assetSize: formData.assetSize,
+        assetOwnerWallet: formData.assetOwnerWallet,
+        assetFeatures: formData.features,
+        offeringDetails: formData.offering,
+        assetDetails: formData.details,
+        assetManagement: formData.management,
+        locationDetails: formData.location,
+        assetDocuments: [pdf],
+        assetImages: gallery,
+        assetThumbImages: [singleImageUrl],
+        complianceAddress,
+        landModel: data.landModel,
+        incomeStreams: data.incomeStreams,
+        active: true,
+      }),
+    });
+    announce(result);
+    setBusy(false);
   };
 
   // Admin gate reads AUTHORITY_ROLE / DEFAULT_ADMIN_ROLE from AssetNFT
@@ -400,7 +420,7 @@ const TokenizeAssetPage = () => {
     <AppLayout>
       <PageHeader
         eyebrow="Administration"
-        title="Tokenize Asset"
+        title="Tokenize Station"
         description="Register a real-world asset on-chain — publish its evidence, deploy a compliance wrapper and mint the asset NFT in one guided flow."
         icon={
           <path
@@ -435,7 +455,7 @@ const TokenizeAssetPage = () => {
         <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_350px]">
           {/* ==================== MAIN FORM ==================== */}
           <Card className="overflow-hidden">
-            {propUploadStatus && busy ? (
+            {registration.info && working ? (
               <div className="flex flex-col items-center px-6 py-14 text-center sm:py-16">
                 <div className="relative mb-5 flex h-16 w-16 items-center justify-center">
                   <span className="absolute inset-0 rounded-full border-[3px] border-indigo-100 dark:border-indigo-500/20" />
@@ -446,10 +466,10 @@ const TokenizeAssetPage = () => {
                   NFT minted — finishing up
                 </h2>
                 <p className="mt-1.5 max-w-md text-sm text-slate-500 dark:text-slate-400">
-                  {uploadStatus || 'Publishing the gallery and registering the asset…'}
+                  {registration.status || uploadStatus || 'Publishing the gallery and registering the asset…'}
                 </p>
               </div>
-            ) : propUploadStatus ? (
+            ) : registration.registered ? (
               <div className="flex flex-col items-center px-6 py-14 text-center sm:py-16">
                 <div className="relative mb-5">
                   <span className="absolute -inset-4 rounded-full bg-emerald-400/20 blur-xl" />
@@ -460,37 +480,29 @@ const TokenizeAssetPage = () => {
                   </span>
                 </div>
                 <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
-                  Asset registered on-chain
+                  Asset registered
                 </h2>
                 <p className="mt-1.5 max-w-md text-sm text-slate-500 dark:text-slate-400">
-                  The NFT is minted and the asset is live in the registry. Save these identifiers.
+                  The NFT is minted and the asset is saved in VARELO. Save these identifiers.
                 </p>
-                <div className="mt-6 w-full max-w-md space-y-2 rounded-2xl bg-slate-50 p-4 text-left dark:bg-slate-950/60">
-                  {propUploadStatus.split('\n').map((line) => {
-                    const idx = line.indexOf(':');
-                    if (idx === -1) {
-                      return (
-                        <p key={line} className="text-xs font-bold tracking-wide text-emerald-600 uppercase dark:text-emerald-400">
-                          {line}
-                        </p>
-                      );
-                    }
-                    return (
-                      <div key={line} className="flex items-start justify-between gap-4">
-                        <span className="shrink-0 text-xs font-semibold text-slate-400 dark:text-slate-500">
-                          {line.slice(0, idx)}:
-                        </span>
-                        <span className="break-all text-right font-mono text-xs text-slate-600 dark:text-slate-300">
-                          {line.slice(idx + 1)}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
+                <MintedIdentifiers info={registration.info} />
                 <Button variant="secondary" className="mt-8" onClick={() => window.location.reload()}>
                   Register another asset
                 </Button>
               </div>
+            ) : registration.unfinished ? (
+              <RegistrationRecovery
+                info={registration.info}
+                error={registration.error}
+                busy={working}
+                onRetry={retryRegistration}
+                onDiscard={() => {
+                  if (window.confirm('Forget this asset in this browser? The NFT stays on-chain, but VARELO will not list it until it is registered.')) {
+                    registration.discard();
+                    setCurrentStep(-1);
+                  }
+                }}
+              />
             ) : (
               <form onSubmit={handleSubmit}>
                 <div className="divide-y divide-slate-100 px-6 pb-6 sm:px-10 dark:divide-slate-800">
@@ -503,7 +515,7 @@ const TokenizeAssetPage = () => {
                         label="Asset name"
                         value={formData.name}
                         onChange={handleInputChange}
-                        placeholder="e.g. Harbourview Tower, Unit 4B"
+                        placeholder="e.g. Khawaneej Fuel & Service Hub"
                         error={errors.name}
                         required
                       />
@@ -512,7 +524,7 @@ const TokenizeAssetPage = () => {
                         label="Location"
                         value={formData.location}
                         onChange={handleInputChange}
-                        placeholder="e.g. Dubai Marina"
+                        placeholder="e.g. Connector road from Amman Street, Al Khawaneej 2, Dubai"
                         error={errors.location}
                         required
                       />
@@ -524,7 +536,7 @@ const TokenizeAssetPage = () => {
                         prefix="$"
                         value={formData.assetPrice}
                         onChange={handleInputChange}
-                        placeholder="500,000"
+                        placeholder="15,000,000"
                         error={errors.assetPrice}
                         hint={priceHint?.text}
                         hintTone={priceHint?.tone}
@@ -538,7 +550,7 @@ const TokenizeAssetPage = () => {
                         suffix="sqft"
                         value={formData.assetSize}
                         onChange={handleInputChange}
-                        placeholder="1,850"
+                        placeholder="40,010"
                         error={errors.assetSize}
                         required
                       />
@@ -565,12 +577,12 @@ const TokenizeAssetPage = () => {
                   <section className="py-6 first:pt-6">
                     <SectionHead title="Listing content" />
                     <div className="space-y-4">
-                      <Input
+                      <Textarea
                         name="features"
                         label="Features"
                         value={formData.features}
                         onChange={handleInputChange}
-                        placeholder="e.g. 3 bedrooms, 2 bathrooms, pool, gym…"
+                        placeholder="e.g. 12 fuel dispensers, automated car wash, convenience store & mall units, ATMs, service bays, EV charging…"
                         error={errors.features}
                       />
                       <Textarea
@@ -579,7 +591,7 @@ const TokenizeAssetPage = () => {
                         rows={4}
                         value={formData.offering}
                         onChange={handleInputChange}
-                        placeholder="e.g. neighborhood livability, local job market, commuter access, and demand drivers behind this offering…"
+                        placeholder="e.g. traffic on the connector road, nearby communities (International City, Al Warqaa, Mirdif), the fuel-company lease terms and the growth drivers behind this offering…"
                         error={errors.offering}
                       />
                       <Textarea
@@ -588,7 +600,7 @@ const TokenizeAssetPage = () => {
                         rows={4}
                         value={formData.details}
                         onChange={handleInputChange}
-                        placeholder="Condition, build year, renovations…"
+                        placeholder="Site area, number of pumps and bays, build year, last refurbishment, permits and licences…"
                         error={errors.details}
                       />
                       <Textarea
@@ -597,10 +609,28 @@ const TokenizeAssetPage = () => {
                         rows={2}
                         value={formData.management}
                         onChange={handleInputChange}
-                        placeholder="Asset management company"
+                        placeholder="e.g. Station operator or fuel company managing the site"
                         error={errors.management}
                       />
                     </div>
+                  </section>
+
+                  {/* Income streams */}
+                  <section className="py-6 first:pt-6">
+                    <SectionHead title="Income streams" />
+                    <p className="-mt-3 mb-5 text-xs text-slate-500 dark:text-slate-400">
+                      Choose how the land works and what the owner shares with token holders each month. Admins can
+                      change this later, and every change is logged.
+                    </p>
+                    <StreamPicker
+                      {...streamSettings}
+                      onChange={(next) => {
+                        setStreamSettings(next);
+                        clearError('incomeStreams');
+                      }}
+                      disabled={busy}
+                    />
+                    {errors.incomeStreams && <p className="mt-2 text-sm font-medium text-red-500">{errors.incomeStreams}</p>}
                   </section>
 
                   {/* 04 Media & documents */}
@@ -624,7 +654,7 @@ const TokenizeAssetPage = () => {
                         label="Gallery images"
                         multiple
                         accept="image/*"
-                        description="Interior & exterior photos for the asset page"
+                        description="Forecourt, car wash, store and service-bay photos for the asset page"
                         fileName={multipleImages.length > 0 ? `${multipleImages.length} image${multipleImages.length > 1 ? 's' : ''}` : ''}
                         meta={
                           multipleImages.length > 0
@@ -681,16 +711,19 @@ const TokenizeAssetPage = () => {
                 <p className="text-[11px] font-bold tracking-[0.14em] text-slate-400 uppercase dark:text-slate-500">
                   Execution flow
                 </p>
-                <Badge tone="warning" dot>
-                  {busy ? 'Running' : 'Approvals'}
+                <Badge tone={registration.unfinished ? 'danger' : 'warning'} dot>
+                  {working ? 'Running' : registration.unfinished ? 'Action needed' : registration.registered ? 'Complete' : 'Approvals'}
                 </Badge>
               </div>
               <ol className="space-y-4">
                 {FLOW_STEPS.map((step, i) => {
                   // currentStep is the step in flight; anything before it is
                   // done, and nothing is "done" before submit (-1).
-                  const running = i === currentStep;
-                  const done = currentStep > i || (currentStep === -1 && Boolean(propUploadStatus) && !busy);
+                  const running = working && i === currentStep;
+                  // Once the NFT exists the four on-chain steps are done; the
+                  // last step is done only when VARELO has actually saved it.
+                  const done = registration.registered || currentStep > i || (Boolean(registration.info) && i < 4);
+                  const failed = registration.unfinished && i === 4;
                   return (
                     <li key={step.title} className="relative flex items-start gap-3">
                       {i < FLOW_STEPS.length - 1 && (
@@ -698,13 +731,17 @@ const TokenizeAssetPage = () => {
                       )}
                       <span
                         className={`relative z-10 mt-0.5 flex h-[23px] w-[23px] shrink-0 items-center justify-center rounded-full text-[10px] font-bold ring-4 ring-white dark:ring-slate-900 ${
-                          done || running
-                            ? 'bg-indigo-400 text-[#1a140e]'
-                            : 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500'
+                          failed
+                            ? 'bg-red-500 text-white'
+                            : done || running
+                              ? 'bg-indigo-400 text-[#1a140e]'
+                              : 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500'
                         }`}
                       >
                         {running ? (
                           <span className="h-2.5 w-2.5 animate-spin rounded-full border-[1.5px] border-current/30 border-t-current" />
+                        ) : failed ? (
+                          '!'
                         ) : done ? (
                           '✓'
                         ) : (

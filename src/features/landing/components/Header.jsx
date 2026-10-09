@@ -1,4 +1,6 @@
+import { Link } from 'react-router-dom';
 import { useLang } from '../context/LangContext';
+import { ROUTES } from '../../../config/routes';
 
 export default function Header() {
   const { t, toggleLang } = useLang();
@@ -23,6 +25,12 @@ export default function Header() {
         >
           {t.langBtn}
         </button>
+        <Link
+          to={ROUTES.marketplace}
+          className="bg-station-gold hover:bg-station-sand rounded-full px-4 py-[7px] text-[13px] font-semibold text-[#060b1f] hover:text-[#060b1f]"
+        >
+          {t.hero.cta1}
+        </Link>
       </nav>
     </header>
   );

@@ -7,6 +7,7 @@ import PublicLayout from '../../../components/layout/PublicLayout';
 import AppLayout from '../../../components/layout/AppLayout';
 import Card from '../../../components/ui/Card';
 import Button from '../../../components/ui/Button';
+import useStickyOffset from '../../../hooks/useStickyOffset';
 import Input from '../../../components/ui/Input';
 import Spinner from '../../../components/ui/Spinner';
 import Progress from '../../../components/ui/Progress';
@@ -17,14 +18,16 @@ import web3Service from '../../../services/web3Service';
 import assetApi from '../api/assetApi';
 import contractsConfig from '../../../config/contracts.config';
 import { ROUTES } from '../../../config/routes';
+import { LAND_MODELS, sortStreams, streamLabel } from '../../../config/incomeStreams';
 import { useWeb3 } from '../../../context/Web3Context';
 import { getContractErrorMessage } from '../../../utils/web3Errors';
 import {
   formatShares,
   formatStable,
-  parseShares,
-  parseStable,
+  parseStablePrice,
+  parseWholeShares,
   sharesTimesPrice,
+  WHOLE_SHARES_MESSAGE,
 } from '../../../utils/units';
 import { cn, formatNumber, formatUsd, shortenAddress, toPercent } from '../../../lib/utils';
 
@@ -282,6 +285,9 @@ const AssetDetailPage = ({ isPublic = false }) => {
   const [saleFeeRate, setSaleFeeRate] = useState(null);
   const [usdcBalance, setUsdcBalance] = useState(null);
   const [shareBalance, setShareBalance] = useState(null);
+  // The rail is taller than most screens: scroll it with the page until its
+  // bottom (the sell-order form) is in view, then stick.
+  const [railRef, railTop] = useStickyOffset();
   const [orders, setOrders] = useState([]);
   const [buyAmounts, setBuyAmounts] = useState({});
   const [sellingTokens, setSellingTokens] = useState('');
@@ -292,6 +298,10 @@ const AssetDetailPage = ({ isPublic = false }) => {
   const [kycStatus, setKycStatus] = useState(false);
   const [showPopup, setShowPopup] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // The transaction in flight: which button it belongs to and the step the
+  // wallet is on, so that button can spin and say what's happening.
+  const [busy, setBusy] = useState(null); // { key, label } | null
+  const busyLabel = (key) => (busy?.key === key ? busy.label : null);
 
   const handleCompleteKYCClick = () => {
     setConfirmedRefId('');
@@ -491,13 +501,13 @@ const AssetDetailPage = ({ isPublic = false }) => {
   };
 
   const buyAssetTokens = async () => {
-    if (!buyTokensAmount || Number(buyTokensAmount) <= 0) {
-      toast.error('Please enter the number of tokens to buy.');
+    const tokensToBuy = parseWholeShares(buyTokensAmount);
+    if (!tokensToBuy) {
+      toast.error(WHOLE_SHARES_MESSAGE);
       return;
     }
+    setBusy({ key: 'buy', label: 'Preparing…' });
     try {
-      const tokensToBuy = parseShares(buyTokensAmount);
-
       // The marketplace pulls the sale price *and* the sale fee from the
       // buyer, so the allowance has to cover both — approving only the
       // token amount leaves the fee transfer to revert.
@@ -507,6 +517,7 @@ const AssetDetailPage = ({ isPublic = false }) => {
       const feeAllowance = estimateSaleFee(totalPrice);
 
       const stableCoinContract = await web3Service.getStableCoinContract();
+      setBusy({ key: 'buy', label: 'Approving USDC…' });
       const approveTx = await stableCoinContract.approve(
         contractsConfig.marketplace.address,
         totalPrice.add(feeAllowance),
@@ -514,6 +525,7 @@ const AssetDetailPage = ({ isPublic = false }) => {
       await approveTx.wait();
 
       const marketplaceContract = await web3Service.getMarketplaceContract();
+      setBusy({ key: 'buy', label: 'Buying shares…' });
       const buyTx = await marketplaceContract.buyTokens(id, tokensToBuy);
       await buyTx.wait();
       toast.success('Tokens purchased successfully!');
@@ -523,6 +535,8 @@ const AssetDetailPage = ({ isPublic = false }) => {
     } catch (error) {
       console.error('Error buying asset tokens:', error);
       toast.error(getContractErrorMessage(error));
+    } finally {
+      setBusy(null);
     }
   };
 
@@ -555,13 +569,14 @@ const AssetDetailPage = ({ isPublic = false }) => {
   };
 
   const buyFromLimit = async (orderId, buyAmount) => {
-    if (!buyAmount || Number(buyAmount) <= 0) {
-      toast.error('Enter the quantity you want to buy.');
+    const formBuyAmount = parseWholeShares(buyAmount);
+    if (!formBuyAmount) {
+      toast.error(WHOLE_SHARES_MESSAGE);
       return;
     }
+    const key = `fill-${orderId}`;
+    setBusy({ key, label: 'Preparing…' });
     try {
-      const formBuyAmount = parseShares(buyAmount);
-
       // fillOrder takes a share count, but the allowance it spends is
       // stablecoin — approve the cost of those shares, not the share count.
       const orderBookRead = web3Service.getReadOnlyOrderBookContract();
@@ -569,10 +584,12 @@ const AssetDetailPage = ({ isPublic = false }) => {
       const cost = sharesTimesPrice(formBuyAmount, order.pricePerToken);
 
       const stableCoinContract = await web3Service.getStableCoinContract();
+      setBusy({ key, label: 'Approving…' });
       const approveTx = await stableCoinContract.approve(contractsConfig.orderBook.address, cost);
       await approveTx.wait();
 
       const orderBookContract = await web3Service.getOrderBookContract();
+      setBusy({ key, label: 'Buying…' });
       const fillTx = await orderBookContract.fillOrder(orderId, formBuyAmount);
       await fillTx.wait();
 
@@ -582,24 +599,31 @@ const AssetDetailPage = ({ isPublic = false }) => {
     } catch (error) {
       console.error('Error buying from limit order:', error);
       toast.error(getContractErrorMessage(error));
+    } finally {
+      setBusy(null);
     }
   };
 
   const createLimitOrder = async () => {
-    if (!orderSellAmount || Number(orderSellAmount) <= 0 || !opricePerToken || Number(opricePerToken) <= 0) {
-      toast.error('Enter a valid amount and price per token.');
+    const formBuyAmount = parseWholeShares(orderSellAmount);
+    if (!formBuyAmount) {
+      toast.error(WHOLE_SHARES_MESSAGE);
       return;
     }
+    const formOrderTokenAmount = parseStablePrice(opricePerToken);
+    if (!formOrderTokenAmount) {
+      toast.error('Enter a price per share greater than 0, with at most 6 decimals.');
+      return;
+    }
+    setBusy({ key: 'create', label: 'Approving shares…' });
     try {
-      const formBuyAmount = parseShares(orderSellAmount);
-      const formOrderTokenAmount = parseStable(opricePerToken);
-
       const assetTokenContract = await web3Service.getShareTokenContract(contractListingData.shareToken);
 
       const approveTx = await assetTokenContract.approve(contractsConfig.orderBook.address, formBuyAmount);
       await approveTx.wait();
 
       const orderBookContract = await web3Service.getOrderBookContract();
+      setBusy({ key: 'create', label: 'Creating order…' });
       const createTx = await orderBookContract.createOrder(
         contractListingData.shareToken,
         formBuyAmount,
@@ -615,10 +639,13 @@ const AssetDetailPage = ({ isPublic = false }) => {
     } catch (error) {
       console.error('Error creating limit order:', error);
       toast.error(getContractErrorMessage(error));
+    } finally {
+      setBusy(null);
     }
   };
 
   const cancelLimitOrder = async (orderId) => {
+    setBusy({ key: `cancel-${orderId}`, label: 'Cancelling…' });
     try {
       const orderBookContract = await web3Service.getOrderBookContract();
       const cancelTx = await orderBookContract.cancelOrder(orderId);
@@ -630,17 +657,19 @@ const AssetDetailPage = ({ isPublic = false }) => {
     } catch (error) {
       console.error('Error cancelling order:', error);
       toast.error(getContractErrorMessage(error, 'Failed to cancel order. Please try again.'));
+    } finally {
+      setBusy(null);
     }
   };
 
   const sellBackTokensContract = async () => {
-    if (!sellingTokens || Number(sellingTokens) <= 0) {
-      toast.error('Enter the number of tokens to sell back.');
+    const convertTokens = parseWholeShares(sellingTokens);
+    if (!convertTokens) {
+      toast.error(WHOLE_SHARES_MESSAGE);
       return;
     }
+    setBusy({ key: 'sellback', label: 'Selling back…' });
     try {
-      const convertTokens = parseShares(sellingTokens);
-
       // sellTokensBack now burns the caller's shares directly via the
       // marketplace's agent role on the Token contract (Token.burn), rather
       // than pulling them in with transferFrom — no ERC-20 approval needed.
@@ -655,6 +684,8 @@ const AssetDetailPage = ({ isPublic = false }) => {
     } catch (error) {
       console.error('Error selling back tokens:', error);
       toast.error(getContractErrorMessage(error, 'Failed to sell back tokens. Please try again.'));
+    } finally {
+      setBusy(null);
     }
   };
 
@@ -852,6 +883,40 @@ const AssetDetailPage = ({ isPublic = false }) => {
             </div>
           </Card>
 
+          {/* Where the monthly rent comes from */}
+          {asset.incomeStreams && (
+            <Card className="p-5 sm:p-6">
+              <SectionLabel>Income sources</SectionLabel>
+              <p className="text-sm font-medium text-slate-800 dark:text-slate-100">
+                {LAND_MODELS[asset.landModel ?? 'RENT']?.label}
+              </p>
+              <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                {LAND_MODELS[asset.landModel ?? 'RENT']?.hint}
+              </p>
+
+              {asset.incomeStreams.length > 0 ? (
+                <>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {sortStreams(asset.incomeStreams).map((key) => (
+                      <Badge key={key} tone="brand" size="md">
+                        {streamLabel(key)}
+                      </Badge>
+                    ))}
+                  </div>
+                  <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+                    Token holders are paid monthly from the streams above, after operating costs. Income not listed
+                    isn’t shared with holders.
+                  </p>
+                </>
+              ) : (
+                <p className="mt-4 text-sm text-slate-600 dark:text-slate-300">
+                  No monthly income is shared with token holders for this asset — holders gain only if the asset
+                  price rises.
+                </p>
+              )}
+            </Card>
+          )}
+
           {/* Story / docs */}
           {(asset.offeringDetails || asset.assetDetails || asset.assetManagement) && (
             <Card className="p-5 sm:p-6">
@@ -913,7 +978,7 @@ const AssetDetailPage = ({ isPublic = false }) => {
         </div>
 
         {/* ---------------- RIGHT RAIL ---------------- */}
-        <div className="space-y-6 lg:sticky lg:top-24">
+        <div ref={railRef} className="space-y-6 lg:sticky" style={{ top: railTop }}>
           {listing.buyBack && isOwner ? (
             <Card className="overflow-hidden border-amber-200/70 p-0 dark:border-amber-900/50">
               <div className="items-center justify-between gap-3 border-b border-amber-200/70 bg-amber-50/70 px-5 py-3 dark:border-amber-900/50 dark:bg-amber-950/20">
@@ -982,8 +1047,13 @@ const AssetDetailPage = ({ isPublic = false }) => {
                       </p>
                     )}
                     <KycGate>
-                      <Button fullWidth onClick={sellBackTokensContract}>
-                        Sell tokens back
+                      <Button
+                        fullWidth
+                        onClick={sellBackTokensContract}
+                        loading={busy?.key === 'sellback'}
+                        disabled={!!busy}
+                      >
+                        {busyLabel('sellback') ?? 'Sell tokens back'}
                       </Button>
                     </KycGate>
                   </>
@@ -1092,9 +1162,20 @@ const AssetDetailPage = ({ isPublic = false }) => {
                 )}
 
                 <KycGate>
-                  <Button fullWidth size="lg" onClick={buyAssetTokens}>
-                    Purchase tokens
+                  <Button
+                    fullWidth
+                    size="lg"
+                    onClick={buyAssetTokens}
+                    loading={busy?.key === 'buy'}
+                    disabled={!!busy}
+                  >
+                    {busyLabel('buy') ?? 'Purchase tokens'}
                   </Button>
+                  {busy?.key === 'buy' && (
+                    <p className="text-center text-xs text-slate-500 dark:text-slate-400">
+                      Two wallet confirmations: approve USDC, then buy. Keep this page open.
+                    </p>
+                  )}
                 </KycGate>
               </div>
             </Card>
@@ -1137,8 +1218,15 @@ const AssetDetailPage = ({ isPublic = false }) => {
                       </div>
 
                       {mine ? (
-                        <Button variant="outlineDanger" size="sm" fullWidth onClick={() => cancelLimitOrder(order.id)}>
-                          Cancel my order
+                        <Button
+                          variant="outlineDanger"
+                          size="sm"
+                          fullWidth
+                          onClick={() => cancelLimitOrder(order.id)}
+                          loading={busy?.key === `cancel-${order.id}`}
+                          disabled={!!busy}
+                        >
+                          {busyLabel(`cancel-${order.id}`) ?? 'Cancel my order'}
                         </Button>
                       ) : (
                         <div className="flex items-center gap-2">
@@ -1151,8 +1239,14 @@ const AssetDetailPage = ({ isPublic = false }) => {
                             className="h-8 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-2.5 text-sm text-slate-900 shadow-sm outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                           />
                           {kycStatus ? (
-                            <Button size="sm" className="shrink-0" onClick={() => buyFromLimit(order.id, buyAmounts[order.id])}>
-                              Buy
+                            <Button
+                              size="sm"
+                              className="shrink-0"
+                              onClick={() => buyFromLimit(order.id, buyAmounts[order.id])}
+                              loading={busy?.key === `fill-${order.id}`}
+                              disabled={!!busy}
+                            >
+                              {busyLabel(`fill-${order.id}`) ?? 'Buy'}
                             </Button>
                           ) : (
                             <Button variant="secondary" size="sm" className="shrink-0" onClick={handleCompleteKYCClick}>
@@ -1168,8 +1262,8 @@ const AssetDetailPage = ({ isPublic = false }) => {
             )}
           </Card>
 
-          {/* Create sell order */}
-          {!isOwner && !listing.buyBack && (
+          {/* Create sell order — only for wallets that hold shares to sell */}
+          {!isOwner && !listing.buyBack && Number(shareBalance) > 0 && (
             <Card className="p-5">
               <SectionLabel>Create sell order</SectionLabel>
               <p className="-mt-2 mb-4 text-sm text-slate-500 dark:text-slate-400">
@@ -1183,6 +1277,7 @@ const AssetDetailPage = ({ isPublic = false }) => {
                   value={orderSellAmount}
                   onChange={(e) => setOrderSellAmount(e.target.value)}
                   placeholder="e.g. 100"
+                  hint={`You hold ${formatNumber(shareBalance, 0)} tokens`}
                 />
                 <Input
                   label="Price per token (USDC)"
@@ -1193,8 +1288,13 @@ const AssetDetailPage = ({ isPublic = false }) => {
                   placeholder="e.g. 42.50"
                 />
                 <KycGate>
-                  <Button fullWidth onClick={createLimitOrder}>
-                    Place sell order
+                  <Button
+                    fullWidth
+                    onClick={createLimitOrder}
+                    loading={busy?.key === 'create'}
+                    disabled={!!busy}
+                  >
+                    {busyLabel('create') ?? 'Place sell order'}
                   </Button>
                 </KycGate>
               </div>

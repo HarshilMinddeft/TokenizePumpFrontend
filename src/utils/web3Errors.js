@@ -39,6 +39,16 @@ const CUSTOM_ERRORS = {
   InvalidOwner: 'This listing owner is not valid.',
   MinBuyBackPremiumNotSet: 'The buyback premium has not been configured yet. Please contact support.',
   BuyBackOpen: 'These shares are eligible for a buyback — cancel the sell order first, then sell them back directly instead of listing on the order book.',
+  // RentDistributor
+  BatchAlreadyExecuted: 'This rent batch has already been paid on-chain.',
+  BatchTooLarge: 'This batch has too many recipients for one transaction.',
+  EmptyBatch: 'This batch has no recipients.',
+  LengthMismatch: 'Recipients and amounts do not line up.',
+  InvalidRecipient: 'One of the recipients is not a valid address.',
+  ZeroAmount: 'One of the payouts is zero.',
+  AccessControlUnauthorizedAccount: 'This wallet is not allowed to distribute rent (missing DISTRIBUTOR_ROLE).',
+  ERC20InsufficientAllowance: 'The stablecoin approval does not cover this batch — approve first.',
+  ERC20InsufficientBalance: 'This wallet does not hold enough stablecoin for this batch.',
 };
 
 const KNOWN_ERRORS = [

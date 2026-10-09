@@ -15,7 +15,7 @@ export const EN = {
     kicker: 'VARELO · Dubai · A world first',
     title: 'The world’s first tokenized fuel station.',
     sub: 'One Dubai station. Three income streams — land rent, fuel income and non-fuel profit — held in one regulated SPV and distributed to token holders every month.',
-    cta1: 'See the structure',
+    cta1: 'Explore stations',
     cta2: 'The three income streams',
     hint: 'Scroll — the camera flies to each business as you read',
   },

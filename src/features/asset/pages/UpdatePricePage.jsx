@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import AppLayout from '../../../components/layout/AppLayout';
-import AssetCard from '../components/AssetCard';
+import RepriceConsole from '../components/RepriceConsole';
 import PageHeader from '../../../components/ui/PageHeader';
-import Button from '../../../components/ui/Button';
-import Select from '../../../components/ui/Select';
 import Spinner from '../../../components/ui/Spinner';
 import EmptyState from '../../../components/ui/EmptyState';
 import web3Service from '../../../services/web3Service';
@@ -12,63 +10,7 @@ import assetApi from '../api/assetApi';
 import useAuthorityRole from '../hooks/useAuthorityRole';
 import { useWeb3 } from '../../../context/Web3Context';
 import { getContractErrorMessage } from '../../../utils/web3Errors';
-import { formatShares, formatStable, isValidPriceTier, parseStable, PRICE_STEP, PRICE_TIERS } from '../../../utils/units';
-
-const PriceControls = ({ listing, onUpdate }) => {
-  const [price, setPrice] = useState(listing.pricePerToken);
-  const [busy, setBusy] = useState(false);
-
-  const unchanged = Number(price) === Number(listing.pricePerToken);
-
-  const handle = async () => {
-    setBusy(true);
-    try {
-      await onUpdate(price);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <div className="space-y-3 border-t border-slate-200 pt-3 dark:border-slate-800">
-      <div className="flex items-baseline justify-between gap-3 text-sm">
-        <span className="text-slate-500 dark:text-slate-400">Current price</span>
-        <span className="font-medium text-slate-700 dark:text-slate-200">
-          ${listing.pricePerToken}
-        </span>
-      </div>
-      <div className="flex items-baseline justify-between gap-3 text-sm">
-        <span className="text-slate-500 dark:text-slate-400">Remaining / total</span>
-        <span className="font-medium text-slate-700 dark:text-slate-200">
-          {listing.remainingTokens} / {listing.totalTokens}
-        </span>
-      </div>
-
-      {listing.buyBack ? (
-        <p className="rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-xs text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-300">
-          A buyback is active on this listing. The buyback price was fixed against the current price
-          when it was funded, so the listing price cannot be changed until it settles.
-        </p>
-      ) : (
-        <>
-          <Select label="New price per share" value={price} onChange={(e) => setPrice(e.target.value)}>
-            {PRICE_TIERS.map((tier) => (
-              <option key={tier} value={tier}>
-                ${tier}
-              </option>
-            ))}
-          </Select>
-          <Button fullWidth onClick={handle} disabled={busy || unchanged}>
-            {busy ? 'Updating…' : unchanged ? 'Price unchanged' : `Update to $${price}`}
-          </Button>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Applies to shares still unsold. Shares already bought are unaffected.
-          </p>
-        </>
-      )}
-    </div>
-  );
-};
+import { formatShares, formatStable, parseStablePrice } from '../../../utils/units';
 
 const UpdatePricePage = () => {
   const { address } = useWeb3();
@@ -82,15 +24,20 @@ const UpdatePricePage = () => {
       const data = await assetApi.getAllMarketplaceAssets();
       const allProps = data.assets || [];
       const marketplace = web3Service.getReadOnlyMarketplaceContract();
+      const vault = web3Service.getReadOnlyVaultContract();
 
       const active = [];
       for (const prop of allProps) {
         try {
           const listing = await marketplace.listings(prop.assetId);
           if (!listing.active) continue;
+          // Slice size = station value ÷ all shares, for the premium/discount line.
+          const { totalShares } = await vault.fractionalData(prop.assetId);
+          const sliceValue = totalShares.isZero() ? null : Number(prop.assetPrice) / Number(formatShares(totalShares));
 
           active.push({
             asset: prop,
+            sliceValue,
             listing: {
               tokenId: prop.assetId,
               pricePerToken: formatStable(listing.pricePerToken),
@@ -117,17 +64,20 @@ const UpdatePricePage = () => {
   }, [isAuthority, load]);
 
   const updatePrice = async (tokenId, price) => {
-    if (!isValidPriceTier(price)) {
-      toast.error(`Price per share must be a multiple of $${PRICE_STEP}.`);
+    // Any positive USDC amount (≤ 6 decimals) — the grade buttons are just
+    // shortcuts; the admin can also type a custom price.
+    const priceUnits = parseStablePrice(String(price));
+    if (!priceUnits) {
+      toast.error('Enter a price above 0, with at most 6 decimals.');
       return;
     }
 
     try {
       const marketplace = await web3Service.getMarketplaceContract();
-      const tx = await marketplace.updateAssetPrice(tokenId, parseStable(price));
+      const tx = await marketplace.updateAssetPrice(tokenId, priceUnits);
       await tx.wait();
 
-      toast.success('Asset price updated.');
+      toast.success(`Price updated to $${price} per share.`);
       load();
     } catch (error) {
       console.error('Error updating asset price:', error);
@@ -162,14 +112,15 @@ const UpdatePricePage = () => {
     }
 
     return (
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {rows.map(({ asset, listing }) => (
-          <AssetCard key={listing.tokenId} asset={asset}>
-            <PriceControls
-              listing={listing}
-              onUpdate={(price) => updatePrice(listing.tokenId, price)}
-            />
-          </AssetCard>
+      <div className="space-y-6">
+        {rows.map(({ asset, listing, sliceValue }) => (
+          <RepriceConsole
+            key={`${listing.tokenId}-${listing.pricePerToken}`}
+            asset={asset}
+            listing={listing}
+            sliceValue={sliceValue}
+            onUpdate={(price) => updatePrice(listing.tokenId, price)}
+          />
         ))}
       </div>
     );
@@ -179,8 +130,8 @@ const UpdatePricePage = () => {
     <AppLayout>
       <PageHeader
         eyebrow="Administration"
-        title="Change Asset Price"
-        description="Reprice active marketplace listings. Requires the marketplace authority role."
+        title="Station Price Sign"
+        description="Change the price per share of live listings — like updating the price on a station sign. The new price applies to shares still on sale; shares already bought are unaffected. Requires the marketplace authority role."
         icon={
           <path
             strokeLinecap="round"

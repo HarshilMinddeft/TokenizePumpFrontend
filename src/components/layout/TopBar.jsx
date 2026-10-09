@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'react-toastify';
-import ThemeToggle from '../ui/ThemeToggle';
 import { useWeb3 } from '../../context/Web3Context';
 import { getPageMeta } from '../../config/navigation';
 import { shortenAddress } from '../../lib/utils';
@@ -69,7 +68,8 @@ const DisconnectIcon = () => (
   </svg>
 );
 
-const ConnectedPill = ({ address, onDisconnect }) => {
+// Also used by PublicTopBar, so wallet actions match on public pages.
+export const ConnectedPill = ({ address, onDisconnect }) => {
   const [open, setOpen] = useState(false);
   const rootRef = useRef(null);
 
@@ -239,7 +239,6 @@ const TopBar = ({ onMenuOpen }) => {
           ) : (
             <ConnectPill onClick={connectWallet} />
           )}
-          <ThemeToggle />
         </div>
       </div>
     </header>

@@ -1,4 +1,6 @@
+import { Link } from 'react-router-dom';
 import { useLang } from '../context/LangContext';
+import { ROUTES } from '../../../config/routes';
 
 export default function Hero() {
   const { t } = useLang();
@@ -30,12 +32,13 @@ export default function Hero() {
           {t.hero.sub}
         </p>
         <div className="mt-1.5 flex flex-wrap gap-3">
-          <a
-            href="#structure"
-            className="bg-station-gold hover:bg-station-sand rounded-full px-[22px] py-3.5 text-[15px] font-semibold text-[#060b1f] hover:text-[#060b1f]"
+          <Link
+            to={ROUTES.marketplace}
+            className="bg-station-gold hover:bg-station-sand inline-flex items-center gap-2 rounded-full px-[22px] py-3.5 text-[15px] font-semibold text-[#060b1f] hover:text-[#060b1f]"
           >
             {t.hero.cta1}
-          </a>
+            <span aria-hidden="true" className="rtl:rotate-180">→</span>
+          </Link>
           <a
             href="#streams"
             className="text-station-ink hover:border-station-gold hover:text-station-gold rounded-full border border-[rgba(238,241,247,.5)] bg-[rgba(20,14,8,.5)] px-[22px] py-3.5 text-[15px] font-semibold"

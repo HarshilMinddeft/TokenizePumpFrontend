@@ -1,26 +1,26 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { motion } from 'motion/react';
 import AppLayout from '../../../components/layout/AppLayout';
-import AssetCard from '../components/AssetCard';
+import StationConsole from '../components/StationConsole';
 import AssetGridSkeleton from '../components/AssetGridSkeleton';
 import PageHeader from '../../../components/ui/PageHeader';
 import StatCard from '../../../components/ui/StatCard';
 import Button from '../../../components/ui/Button';
-import Select from '../../../components/ui/Select';
 import EmptyState from '../../../components/ui/EmptyState';
-import Badge from '../../../components/ui/Badge';
 import web3Service from '../../../services/web3Service';
 import assetApi from '../api/assetApi';
 import contractsConfig from '../../../config/contracts.config';
 import useAssetsFilteredBy from '../hooks/useAssetsFilteredBy';
 import { useWeb3 } from '../../../context/Web3Context';
 import { getContractErrorMessage } from '../../../utils/web3Errors';
-import { evenlyDividingTiers, PRICE_STEP } from '../../../utils/units';
-import { formatNumber, formatUsd, shortenAddress } from '../../../lib/utils';
+import { evenlyDividingTiers } from '../../../utils/units';
+import { formatNumber, formatUsd } from '../../../lib/utils';
+import { ROUTES } from '../../../config/routes';
 
-/** Suggested price per share, in whole dollars, when the owner hasn't chosen one. */
-const DEFAULT_BASE_PRICE = 40;
+/** Suggested slice size (dollars of station value per share) when the owner hasn't chosen one. */
+const DEFAULT_SLICE_VALUE = 40;
 
 const isNotFractionalized = async (asset, assetNftContract) => {
   const isFrac = await assetNftContract.isFractionalized(asset.assetId);
@@ -39,14 +39,17 @@ const rise = {
 /** Cheapest evenly-dividing tier — used for the estimate before the owner picks one. */
 const cheapestTierFor = (assetPrice) => {
   const tiers = evenlyDividingTiers(assetPrice);
-  return tiers.includes(DEFAULT_BASE_PRICE) ? DEFAULT_BASE_PRICE : tiers[0];
+  return tiers.includes(DEFAULT_SLICE_VALUE) ? DEFAULT_SLICE_VALUE : tiers[0];
 };
 
 const FractionalizePage = () => {
   const { address: userAddress } = useWeb3();
   const [fractionalEvents, setFractionalEvents] = useState({});
-  const [basePrices, setBasePrices] = useState({});
-  const [busyId, setBusyId] = useState(null);
+  const [sliceValues, setSliceValues] = useState({});
+  // tokenId → 'approve' | 'lock' | 'mint' while that on-chain step runs
+  const [stages, setStages] = useState({});
+  const navigate = useNavigate();
+  const setStage = (id, stage) => setStages((prev) => ({ ...prev, [id]: stage }));
 
   const { assets, loading } = useAssetsFilteredBy(
     () => (userAddress ? assetApi.getOwnerAssets(userAddress) : Promise.resolve({ assets: [] })),
@@ -66,21 +69,23 @@ const FractionalizePage = () => {
     return { value, shares };
   }, [assets]);
 
-  const fractionalize = async (tokenId, complianceAddress, basePrice) => {
-    setBusyId(tokenId);
+  const fractionalize = async (tokenId, complianceAddress, sliceValue) => {
+    setStage(tokenId, 'approve');
     try {
       const assetNftContract = await web3Service.getAssetNftContract();
       const approveTx = await assetNftContract.approve(contractsConfig.vault.address, tokenId);
       await approveTx.wait();
 
+      setStage(tokenId, 'lock');
       const vaultContract = await web3Service.getVaultContract();
-      // _basePrice divides the NFT's assetPrice, which is stored as a
-      // whole-dollar figure — so it is passed unscaled, not in stablecoin units.
+      // _sliceValue divides the NFT's assetPrice (whole dollars) into whole
+      // shares — passed unscaled, not in stablecoin units. Not a sale price.
       const vaultTx = await vaultContract.fractionalizeAsset(
         tokenId,
         complianceAddress,
-        Math.floor(Number(basePrice)),
+        Math.floor(Number(sliceValue)),
       );
+      setStage(tokenId, 'mint');
       await vaultTx.wait();
 
       const assetToken = await vaultContract.fractionalData(tokenId);
@@ -93,12 +98,12 @@ const FractionalizePage = () => {
           complianceAddress: assetToken.complianceAddress,
         },
       }));
-      toast.success('Asset fractionalized successfully.');
+      toast.success('Station fractionalized — shares minted to your wallet.');
     } catch (error) {
       console.error('Error in Fractionalize:', error);
       toast.error(getContractErrorMessage(error, 'Fractionalization failed. Please try again.'));
     } finally {
-      setBusyId(null);
+      setStage(tokenId, null);
     }
   };
 
@@ -106,8 +111,8 @@ const FractionalizePage = () => {
     <AppLayout>
       <PageHeader
         eyebrow="Your assets"
-        title="Fractionalize Asset"
-        description="Split a tokenized asset into a compliant share token. Fractionalized assets can then be listed on the marketplace or traded via the order book."
+        title="Fractionalize a Station"
+        description="Turn a tokenized fuel station into compliant shares. Pick a slice size (how much value each share represents), lock the station NFT in the vault, and the shares — each earning from the station’s income streams — land in your wallet, ready to list."
         icon={
           <path
             strokeLinecap="round"
@@ -120,22 +125,22 @@ const FractionalizePage = () => {
       {!loading && (
         <div className="mb-8 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
           <StatCard
-            label="Eligible assets"
+            label="Total Stations ready"
             value={formatNumber(assets.length, 0)}
             tone="brand"
             icon={<ChipIcon />}
           />
           <StatCard
-            label="Shares to be created across all assets"
+            label="All Shares to be minted"
             value={formatNumber(totals.shares, 0)}
-            sub="At each one's cheapest divisible price"
+            sub="at each station’s default slice size"
             tone="success"
             icon={<CoinsIcon />}
           />
           <StatCard
-            label="Asset value unlocking"
+            label="All Station value unlocking"
             value={formatUsd(totals.value, 0)}
-            sub="across eligible assets"
+            sub="across your stations"
             tone="warning"
             icon={<TrendIcon />}
           />
@@ -145,109 +150,42 @@ const FractionalizePage = () => {
       {loading ? (
         <AssetGridSkeleton />
       ) : assets.length > 0 ? (
-        <motion.div
-          variants={stagger}
-          initial="hidden"
-          animate="show"
-          className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3"
-        >
-          {assets.map((prop) => {
-            const validTiers = evenlyDividingTiers(prop.assetPrice);
-            const defaultTier = validTiers.includes(DEFAULT_BASE_PRICE) ? DEFAULT_BASE_PRICE : validTiers[0];
-            const basePrice = basePrices[prop.assetId] ?? String(defaultTier ?? '');
-            const shares = Number(basePrice) > 0 ? Math.floor(Number(prop.assetPrice) / Number(basePrice)) : 0;
-            const done = fractionalEvents[prop.assetId];
-
+        <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-6">
+          {assets.map((station) => {
+            const tiers = evenlyDividingTiers(station.assetPrice);
+            const defaultTier = tiers.includes(DEFAULT_SLICE_VALUE) ? DEFAULT_SLICE_VALUE : tiers[0];
+            const sliceValue = sliceValues[station.assetId] ?? String(defaultTier ?? '');
             return (
-              <motion.div key={prop.assetId} variants={rise} className="h-full">
-                <AssetCard asset={prop}>
-                  {done ? (
-                    <SuccessPanel
-                      shareToken={done.shareToken}
-                      totalShares={done.totalShares}
-                      caption="This asset is now fractionalized. List it on the marketplace to start selling shares."
-                    />
-                  ) : (
-                    <div className="space-y-3">
-                      {validTiers.length > 0 ? (
-                        <Select
-                          label="Price per share"
-                          value={basePrice}
-                          onChange={(e) => setBasePrices((prev) => ({ ...prev, [prop.assetId]: e.target.value }))}
-                        >
-                          {validTiers.map((tier) => (
-                            <option key={tier} value={tier}>
-                              ${tier}
-                            </option>
-                          ))}
-                        </Select>
-                      ) : (
-                        <p className="text-xs font-medium text-red-500 dark:text-red-400">
-                          No ${PRICE_STEP}-multiple price evenly divides ${prop.assetPrice} — this asset
-                          cannot be fractionalized into whole shares.
-                        </p>
-                      )}
-                      <div className="flex items-center justify-between rounded-xl bg-indigo-50/70 px-3.5 py-2.5 text-[13px] dark:bg-indigo-500/10">
-                        <span className="font-medium text-slate-500 dark:text-slate-400">Share supply created</span>
-                        <span className="font-bold text-indigo-700 tabular-nums dark:text-indigo-300">
-                          {shares.toLocaleString()} tokens
-                        </span>
-                      </div>
-                      <Button
-                        fullWidth
-                        loading={busyId === prop.assetId}
-                        disabled={shares === 0}
-                        onClick={() => fractionalize(prop.assetId, prop.complianceAddress, basePrice)}
-                      >
-                        Fractionalize asset
-                      </Button>
-                      <p className="text-center text-[11px] text-slate-400 dark:text-slate-500">
-                        Approve the NFT, then the vault mints the share token
-                      </p>
-                    </div>
-                  )}
-                </AssetCard>
+              <motion.div key={station.assetId} variants={rise}>
+                <StationConsole
+                  asset={station}
+                  tiers={tiers}
+                  sliceValue={sliceValue}
+                  onPick={(value) => setSliceValues((prev) => ({ ...prev, [station.assetId]: value }))}
+                  stage={stages[station.assetId]}
+                  result={fractionalEvents[station.assetId]}
+                  onFractionalize={() => fractionalize(station.assetId, station.complianceAddress, sliceValue)}
+                  onList={() => navigate(ROUTES.listAsset)}
+                />
               </motion.div>
             );
           })}
         </motion.div>
       ) : (
         <EmptyState
-          title="No assets ready to fractionalize"
+          title="No stations ready to fractionalize"
           action={
-            <Button variant="soft" size="sm" onClick={() => (window.location.href = '/tokenize-asset')}>
+            <Button variant="soft" size="sm" onClick={() => navigate(ROUTES.tokenizeAsset)}>
               Tokenize an asset first
             </Button>
           }
         >
-          You don’t own any tokenized assets yet. Once an asset NFT is minted to your wallet it will appear here.
+          You don’t own a tokenized station yet. Once a station NFT is minted to your wallet it will appear here.
         </EmptyState>
       )}
     </AppLayout>
   );
 };
-
-/* Shared success panel used by several asset pages */
-const SuccessPanel = ({ shareToken, totalShares, caption, label = 'Completed' }) => (
-  <div className="rounded-xl border border-emerald-200/70 bg-emerald-50/60 p-3.5 dark:border-emerald-900/60 dark:bg-emerald-950/30">
-    <div className="mb-2 flex items-center justify-between">
-      <Badge tone="success" dot>
-        {label}
-      </Badge>
-      {totalShares && (
-        <span className="text-xs font-semibold text-emerald-700 tabular-nums dark:text-emerald-300">
-          {formatNumber(totalShares)} shares
-        </span>
-      )}
-    </div>
-    {shareToken && (
-      <p className="truncate font-mono text-[11px] text-emerald-700/80 dark:text-emerald-300/70">
-        {shortenAddress(shareToken, 10, 6)}
-      </p>
-    )}
-    {caption && <p className="mt-2 text-xs leading-relaxed text-emerald-800/80 dark:text-emerald-200/70">{caption}</p>}
-  </div>
-);
 
 const ChipIcon = () => (
   <svg className="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>

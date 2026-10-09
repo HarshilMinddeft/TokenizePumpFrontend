@@ -3,31 +3,29 @@ import { ethers } from 'ethers';
 import { toast } from 'react-toastify';
 import { motion } from 'motion/react';
 import AppLayout from '../../../components/layout/AppLayout';
-import AssetCard from '../components/AssetCard';
+import ListingConsole from '../components/ListingConsole';
 import AssetGridSkeleton from '../components/AssetGridSkeleton';
 import PageHeader from '../../../components/ui/PageHeader';
 import StatCard from '../../../components/ui/StatCard';
 import Button from '../../../components/ui/Button';
-import Input from '../../../components/ui/Input';
-import Select from '../../../components/ui/Select';
 import EmptyState from '../../../components/ui/EmptyState';
-import Badge from '../../../components/ui/Badge';
 import web3Service from '../../../services/web3Service';
 import assetApi from '../api/assetApi';
 import contractsConfig from '../../../config/contracts.config';
 import { useWeb3 } from '../../../context/Web3Context';
 import { getContractErrorMessage } from '../../../utils/web3Errors';
-import { ROUTES } from '../../../config/routes';
+import { ROUTES, getAppAssetDetailsPath } from '../../../config/routes';
 import {
   formatShares,
   formatStable,
   isValidPriceTier,
-  parseShares,
   parseStable,
+  parseWholeShares,
   PRICE_STEP,
   PRICE_TIERS,
+  WHOLE_SHARES_MESSAGE,
 } from '../../../utils/units';
-import { formatNumber, formatUsd, shortenAddress } from '../../../lib/utils';
+import { formatNumber } from '../../../lib/utils';
 
 const DEFAULT_LISTING_PRICE = 40;
 
@@ -49,9 +47,11 @@ const ListMarketplacePage = () => {
   const [priceInputs, setPriceInputs] = useState({});
   const [existingListings, setExistingListings] = useState({});
   const [blockedByBuyBack, setBlockedByBuyBack] = useState({});
-  const [fractionalizeBasePrices, setFractionalizeBasePrices] = useState({});
+  const [sliceValues, setSliceValues] = useState({});
   const [userTokenBalances, setUserTokenBalances] = useState([]);
-  const [busyId, setBusyId] = useState(null);
+  // tokenId → 'approve' | 'list' while that on-chain step runs
+  const [stages, setStages] = useState({});
+  const setStage = (id, stage) => setStages((prev) => ({ ...prev, [id]: stage }));
 
   const totals = useMemo(() => {
     let balance = 0;
@@ -91,14 +91,15 @@ const ListMarketplacePage = () => {
           // and then call withdrawBuyBackDeposit before re-listing.
           setBlockedByBuyBack((prev) => ({ ...prev, [prop.assetId]: listing.buyBack }));
 
-          // The vault doesn't store the base price Fractionalize used, but
+          // The vault doesn't store the slice size Fractionalize used, but
           // assetPrice / totalShares recovers it exactly (that's how
-          // totalShares was derived in the first place).
+          // totalShares was derived in the first place). It's the starting
+          // listing price: at that price, all shares add up to the station value.
           if (!listing.active) {
             const { totalShares } = await vaultContract.fractionalData(prop.assetId);
             if (!totalShares.isZero()) {
-              const basePrice = Number(prop.assetPrice) / Number(formatShares(totalShares));
-              setFractionalizeBasePrices((prev) => ({ ...prev, [prop.assetId]: basePrice }));
+              const sliceValue = Number(prop.assetPrice) / Number(formatShares(totalShares));
+              setSliceValues((prev) => ({ ...prev, [prop.assetId]: sliceValue }));
             }
           }
         } catch (err) {
@@ -153,9 +154,9 @@ const ListMarketplacePage = () => {
   };
 
   const listToMarketplace = async (tokenId, listingPrice) => {
-    const inputValue = tokensInputs[tokenId];
-    if (!inputValue || Number(inputValue) <= 0) {
-      toast.error('Please enter the number of tokens to list.');
+    const tokensToListForProp = parseWholeShares(tokensInputs[tokenId]);
+    if (!tokensToListForProp) {
+      toast.error(WHOLE_SHARES_MESSAGE);
       return;
     }
 
@@ -164,9 +165,8 @@ const ListMarketplacePage = () => {
       return;
     }
 
-    setBusyId(tokenId);
+    setStage(tokenId, 'approve');
     try {
-      const tokensToListForProp = parseShares(inputValue);
 
       const vaultContract = await web3Service.getVaultContract();
       const assetToken = await vaultContract.fractionalData(tokenId);
@@ -181,6 +181,7 @@ const ListMarketplacePage = () => {
       const approveTx = await assetTokensTxn.approve(contractsConfig.marketplace.address, tokensToListForProp);
       await approveTx.wait();
 
+      setStage(tokenId, 'list');
       if (!checkListing) {
         // listAsset takes the share token itself (not the tokenId) and the
         // opening price; the marketplace derives the tokenId from the token.
@@ -209,14 +210,14 @@ const ListMarketplacePage = () => {
       }));
       setExistingListings((prev) => ({ ...prev, [tokenId]: listingInfo.pricePerToken }));
 
-      toast.success('Successfully listed to marketplace!');
+      toast.success('Your shares are live on the marketplace.');
       setTokenInputs((prev) => ({ ...prev, [tokenId]: '' }));
       fetchUserTokenBalance();
     } catch (error) {
       console.error('Error listing tokens:', error);
       toast.error(getContractErrorMessage(error, 'Failed to list tokens. Please try again.'));
     } finally {
-      setBusyId(null);
+      setStage(tokenId, null);
     }
   };
 
@@ -246,13 +247,14 @@ const ListMarketplacePage = () => {
     const found = userTokenBalances.find((b) => b.assetId === id);
     return found ? found.balance : '0';
   };
+  const shareTokenFor = (id) => userTokenBalances.find((b) => b.assetId === id)?.tokenAddress;
 
   return (
     <AppLayout>
       <PageHeader
         eyebrow="Your assets"
         title="List to Marketplace"
-        description="Put your fractional shares up for sale. Price per share defaults to what the asset was fractionalized at, and buyers pay with USDC."
+        description="Put your station shares up for sale. Shares sell at the price they were created at when the station was fractionalized, so the shares always add up to the station's value. Buyers pay in USDC."
         icon={
           <path
             strokeLinecap="round"
@@ -265,7 +267,7 @@ const ListMarketplacePage = () => {
       {!loading && (
         <div className="mb-8 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
           <StatCard
-            label="Fractionalized assets"
+            label="Stations with shares"
             value={formatNumber(assets.length, 0)}
             tone="brand"
             icon={<ListIcon />}
@@ -273,14 +275,14 @@ const ListMarketplacePage = () => {
           <StatCard
             label="Shares you hold"
             value={formatNumber(totals.balance, 0)}
-            sub="across your portfolio"
+            sub="ready to list across your stations"
             tone="success"
             icon={<CoinsIcon />}
           />
           <StatCard
-            label="Already listed"
+            label="Live listings"
             value={`${formatNumber(totals.listedCount, 0)} / ${formatNumber(assets.length, 0)}`}
-            sub="assets live on the marketplace"
+            sub="stations live on the marketplace"
             tone="warning"
             icon={<PriceIcon />}
           />
@@ -290,136 +292,56 @@ const ListMarketplacePage = () => {
       {loading ? (
         <AssetGridSkeleton />
       ) : assets.length > 0 ? (
-        <motion.div
-          variants={stagger}
-          initial="hidden"
-          animate="show"
-          className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3"
-        >
-          {assets.map((prop) => {
-            const availableBalance = balanceFor(prop.assetId);
-            const listingDone = fractionalEvents[prop.assetId];
-            const listedPrice = existingListings[prop.assetId];
-            const blocked = blockedByBuyBack[prop.assetId];
-
-            // Default the dropdown to the price per share this asset was
-            // fractionalized at, snapped to the nearest offered tier — the
-            // owner can still pick a different tier before listing.
-            const basePrice = fractionalizeBasePrices[prop.assetId];
-            const defaultPrice = basePrice
-              ? PRICE_TIERS.reduce((closest, tier) =>
-                  Math.abs(tier - basePrice) < Math.abs(closest - basePrice) ? tier : closest,
-                )
-              : DEFAULT_LISTING_PRICE;
-            const selectedPrice = priceInputs[prop.assetId] ?? defaultPrice;
+        <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-6">
+          {assets.map((station) => {
+            // The owner sets the price per share here ($10–$100). It starts at
+            // the slice size (station value ÷ shares), where all shares add up
+            // to the station's value; any other price is a deliberate premium
+            // or discount, which the board shows.
+            const sliceValue = sliceValues[station.assetId];
+            const defaultPrice = isValidPriceTier(sliceValue)
+              ? sliceValue
+              : sliceValue
+                ? PRICE_TIERS.reduce((closest, tier) =>
+                    Math.abs(tier - sliceValue) < Math.abs(closest - sliceValue) ? tier : closest,
+                  )
+                : DEFAULT_LISTING_PRICE;
+            const selectedPrice = priceInputs[station.assetId] ?? defaultPrice;
 
             return (
-              <motion.div key={prop.assetId} variants={rise} className="h-full">
-                <AssetCard asset={prop}>
-                  {listingDone ? (
-                    <div className="rounded-xl border border-emerald-200/70 bg-emerald-50/60 p-3.5 dark:border-emerald-900/60 dark:bg-emerald-950/30">
-                      <div className="mb-2 flex items-center justify-between">
-                        <Badge tone="success" dot>
-                          Live on marketplace
-                        </Badge>
-                        <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">
-                          {formatNumber(listingDone.remainingTokens)} remaining
-                        </span>
-                      </div>
-                      <div className="space-y-1 text-xs text-emerald-800/80 dark:text-emerald-200/70">
-                        <p className="flex items-center justify-between">
-                          <span>Price per token</span>
-                          <span className="font-mono font-semibold">{formatUsd(listingDone.pricePerToken)}</span>
-                        </p>
-                        <p className="truncate">
-                          <span className="mr-1.5 text-emerald-700/60 dark:text-emerald-300/50">Token</span>
-                          {shortenAddress(listingDone.shareToken, 10, 6)}
-                        </p>
-                      </div>
-                    </div>
-                  ) : blocked ? (
-                    <div className="space-y-2 rounded-xl bg-amber-50 px-3.5 py-3 text-[12.5px] leading-relaxed text-amber-800 dark:bg-amber-950/20 dark:text-amber-300">
-                      <p>
-                        A buyback from this asset&apos;s last listing is still open. It has to be withdrawn before
-                        you can list again.
-                      </p>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        fullWidth
-                        onClick={() => (window.location.href = ROUTES.withdrawBuyBack)}
-                      >
-                        Go to Withdraw Buyback
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between rounded-xl bg-indigo-50/70 px-3.5 py-2.5 text-[13px] dark:bg-indigo-500/10">
-                        <span className="font-medium text-slate-500 dark:text-slate-400">Your balance</span>
-                        <span className="font-bold text-indigo-700 tabular-nums dark:text-indigo-300">
-                          {formatNumber(availableBalance)} tokens
-                        </span>
-                      </div>
-                      <Input
-                        label="Tokens to list"
-                        type="number"
-                        min="0"
-                        placeholder="e.g. 500"
-                        value={tokensInputs[prop.assetId] || ''}
-                        onChange={(e) => handleInputChange(prop.assetId, e.target.value)}
-                        hint={
-                          Number(availableBalance) > 0
-                            ? `Available: ${formatNumber(availableBalance)} tokens`
-                            : 'No share balance found for this wallet'
-                        }
-                      />
-                      {listedPrice ? (
-                        <p className="text-xs text-slate-500 dark:text-slate-400">
-                          Already listed at{' '}
-                          <span className="font-medium text-slate-600 dark:text-slate-300">${listedPrice}</span> per
-                          share. These tokens will be added to that listing at the same price.
-                        </p>
-                      ) : (
-                        <Select
-                          label="Price per share"
-                          value={selectedPrice}
-                          onChange={(e) => setPriceInputs((prev) => ({ ...prev, [prop.assetId]: e.target.value }))}
-                        >
-                          {PRICE_TIERS.map((tier) => (
-                            <option key={tier} value={tier}>
-                              ${tier}
-                            </option>
-                          ))}
-                        </Select>
-                      )}
-                      <Button
-                        fullWidth
-                        disabled={Number(availableBalance) <= 0}
-                        loading={busyId === prop.assetId}
-                        onClick={() => listToMarketplace(prop.assetId, selectedPrice)}
-                      >
-                        {listedPrice ? 'Add to listing' : `List at $${selectedPrice}/token`}
-                      </Button>
-                      <p className="text-center text-[11px] text-slate-400 dark:text-slate-500">
-                        Approve the marketplace, then the shares go live instantly
-                      </p>
-                    </div>
-                  )}
-                </AssetCard>
+              <motion.div key={station.assetId} variants={rise}>
+                <ListingConsole
+                  asset={station}
+                  balance={balanceFor(station.assetId)}
+                  shareToken={shareTokenFor(station.assetId)}
+                  price={selectedPrice}
+                  sliceValue={sliceValue}
+                  priceOptions={PRICE_TIERS}
+                  onPickPrice={(value) => setPriceInputs((prev) => ({ ...prev, [station.assetId]: value }))}
+                  listedPrice={existingListings[station.assetId]}
+                  blocked={blockedByBuyBack[station.assetId]}
+                  amount={tokensInputs[station.assetId] ?? ''}
+                  onAmount={(value) => handleInputChange(station.assetId, value)}
+                  onList={() => listToMarketplace(station.assetId, selectedPrice)}
+                  stage={stages[station.assetId]}
+                  done={fractionalEvents[station.assetId]}
+                  onWithdraw={() => (window.location.href = ROUTES.withdrawBuyBack)}
+                  onView={() => (window.location.href = getAppAssetDetailsPath(station.assetId))}
+                />
               </motion.div>
             );
           })}
         </motion.div>
       ) : (
         <EmptyState
-          title="No fractionalized assets found"
+          title="No stations with shares yet"
           action={
             <Button variant="soft" size="sm" onClick={() => (window.location.href = '/fractionalize-asset')}>
-              Fractionalize an asset
+              Fractionalize a station
             </Button>
           }
         >
-          Assets appear here once they are fractionalized and owned by your connected wallet.
+          A station appears here once you fractionalize it — its shares are then ready to list.
         </EmptyState>
       )}
     </AppLayout>

@@ -8,6 +8,7 @@ import ModularComplianceArtifact from './abis/ModularCompliance.json';
 import IdentityRegistryArtifact from './abis/IdentityRegistry.json';
 import FeeManagerArtifact from './abis/FeeManager.json';
 import FractionalVaultArtifact from './abis/FractionalVault.json';
+import RentDistributorArtifact from './abis/RentDistributor.json';
 
 export const contractsConfig = {
   marketplace: {
@@ -38,6 +39,12 @@ export const contractsConfig = {
   identityRegistry: {
     address: envConfig.identityRegistryAddress,
     abi: IdentityRegistryArtifact.abi,
+  },
+  // Pays a batch of monthly rent to many holders in one transaction; signed
+  // from the admin's wallet on the Rent Distribution page.
+  rentDistributor: {
+    address: envConfig.rentDistributorAddress,
+    abi: RentDistributorArtifact.abi,
   },
   feeManager: {
     // Address is read from the marketplace at call time (marketplace.feeManager()),

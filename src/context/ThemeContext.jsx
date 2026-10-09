@@ -7,11 +7,10 @@ const ThemeContext = createContext({
   toggleTheme: () => {},
 });
 
-const getInitialTheme = () => {
-  if (typeof window === 'undefined') return 'dark';
-  const stored = window.localStorage.getItem(STORAGE_KEY);
-  return stored === 'light' || stored === 'dark' ? stored : 'dark';
-};
+// Light theme isn't finished yet, so the toggle is hidden and everyone gets
+// dark — including visitors who saved 'light' earlier. To bring it back,
+// restore the stored value here and re-add <ThemeToggle /> to the top bars.
+const getInitialTheme = () => 'dark';
 
 export const ThemeProvider = ({ children }) => {
   const [theme, setTheme] = useState(getInitialTheme);

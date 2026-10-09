@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 // landing.css is loaded globally via src/app/index.css (`@import
 // '../features/landing/landing.css'`) so the Tailwind compiler actually
 // processes its @theme/@utility blocks — see the comment there. No local
@@ -20,13 +20,16 @@ import PlatformIntro from './components/PlatformIntro';
 import PlatformFeatures from './components/PlatformFeatures';
 import Footer from './components/Footer';
 import Hud from './components/Hud';
+import VareloLoader from './loader/VareloLoader';
 
 function StationLandingInner() {
   const rootRef = useRef(null);
   const laserRef = useRef(null);
   const ringRef = useRef(null);
   const { lang, dir, zone, setZone, dashTab, setDash, dashPauseUntil, pauseDash } = useLang();
-  const { ready, flyTo } = useStation();
+  const { ready, flyTo, frameRef } = useStation();
+  // Preloader over the page until the 3D station's models are in.
+  const [loading, setLoading] = useState(true);
 
   useScrollChoreography({
     rootRef,
@@ -51,6 +54,7 @@ function StationLandingInner() {
 
   return (
     <div ref={rootRef} dir={dir} lang={lang} className="station-landing">
+      {loading && <VareloLoader frameRef={frameRef} onDone={() => setLoading(false)} />}
       <StationBackground />
 
       <div

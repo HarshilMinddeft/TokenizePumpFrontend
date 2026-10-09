@@ -1,6 +1,7 @@
 import { ethers } from 'ethers';
 import { z } from 'zod';
 import { evenlyDividingTiers, PRICE_STEP } from '../../../utils/units';
+import { STREAM_KEYS } from '../../../config/incomeStreams';
 
 /**
  * Asset Size / Price are collected as free text (e.g. "4151 Sqft",
@@ -32,8 +33,8 @@ const walletAddress = (fieldLabel) =>
  */
 export const tokenizeAssetSchema = z.object({
   name: requiredText('Asset Name'),
-  // FractionalVault.fractionalizeAsset mints assetPrice / basePrice
-  // shares with no remainder allowed (SHARE_DECIMALS == 0), and basePrice
+  // FractionalVault.fractionalizeAsset mints assetPrice / sliceValue
+  // shares with no remainder allowed (SHARE_DECIMALS == 0), and sliceValue
   // is only ever offered in $10 steps at fractionalize time — so a price
   // with no evenly-dividing $10 tier can never be fractionalized later.
   // Caught here, at entry, rather than letting the asset mint as a dead
@@ -44,7 +45,7 @@ export const tokenizeAssetSchema = z.object({
     if (evenlyDividingTiers(price).length === 0) {
       ctx.addIssue({
         code: 'custom',
-        message: `No $${PRICE_STEP}-multiple price per share divides $${price} evenly — choose a price that's a multiple of $${PRICE_STEP}.`,
+        message: `No $${PRICE_STEP}-multiple slice size divides $${price} evenly — choose a value that's a multiple of $${PRICE_STEP}.`,
       });
     }
   }),
@@ -58,4 +59,16 @@ export const tokenizeAssetSchema = z.object({
   singleImage: z
     .instanceof(File, { message: 'Upload a primary asset image.' })
     .refine((file) => file.size > 0, 'Upload a primary asset image.'),
+  // How the land reaches holders and which income streams the owner shares
+  // with them each month (a stream not listed is not shared — fixed at 0).
+  landModel: z.enum(['RENT', 'APPRECIATION']),
+  incomeStreams: z.array(z.enum(STREAM_KEYS)),
+}).superRefine((data, ctx) => {
+  if (data.landModel === 'APPRECIATION' && data.incomeStreams.includes('LAND_RENT')) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['incomeStreams'],
+      message: 'Land rent can’t be shared when the land is owned by the fuel owner.',
+    });
+  }
 });

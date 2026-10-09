@@ -3,14 +3,12 @@ import { ethers } from 'ethers';
 import { toast } from 'react-toastify';
 import { motion } from 'motion/react';
 import AppLayout from '../../../components/layout/AppLayout';
-import AssetCard from '../components/AssetCard';
+import CancelConsole from '../components/CancelConsole';
 import AssetGridSkeleton from '../components/AssetGridSkeleton';
 import PageHeader from '../../../components/ui/PageHeader';
 import StatCard from '../../../components/ui/StatCard';
 import Button from '../../../components/ui/Button';
-import Input from '../../../components/ui/Input';
 import EmptyState from '../../../components/ui/EmptyState';
-import Badge from '../../../components/ui/Badge';
 import web3Service from '../../../services/web3Service';
 import assetApi from '../api/assetApi';
 import contractsConfig from '../../../config/contracts.config';
@@ -22,12 +20,6 @@ import { ROUTES } from '../../../config/routes';
 
 /** Buyback must be priced at least 10% above the listing price (contract rule). */
 const MIN_BUYBACK_MULTIPLIER = 1.1;
-
-const formatDeadline = (timestamp) =>
-  new Date(Number(timestamp) * 1000).toLocaleString(undefined, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  });
 
 const stagger = {
   hidden: {},
@@ -51,7 +43,10 @@ const CancelListingPage = () => {
   const [listingPrices, setListingPrices] = useState({});
   const [outstandingShares, setOutstandingShares] = useState({});
   const [buyBackPrices, setBuyBackPrices] = useState({});
-  const [busyId, setBusyId] = useState(null);
+  const [unsoldShares, setUnsoldShares] = useState({});
+  // tokenId → 'approve' | 'cancel' while that on-chain step runs
+  const [stages, setStages] = useState({});
+  const setStage = (id, stage) => setStages((prev) => ({ ...prev, [id]: stage }));
 
   const totals = useMemo(() => {
     let shares = 0;
@@ -91,6 +86,7 @@ const CancelListingPage = () => {
             ...prev,
             [prop.assetId]: formatShares(outstanding),
           }));
+          setUnsoldShares((prev) => ({ ...prev, [prop.assetId]: formatShares(checkListing.remainingTokens) }));
           setListingPrices((prev) => ({
             ...prev,
             [prop.assetId]: formatStable(checkListing.pricePerToken),
@@ -159,7 +155,8 @@ const CancelListingPage = () => {
   };
 
   const cancelListing = async (tokenId, buyBackPriceInput) => {
-    setBusyId(tokenId);
+    const hasOutstandingNow = Number(outstandingShares[tokenId]) > 0;
+    setStage(tokenId, hasOutstandingNow ? 'approve' : 'cancel');
     try {
       const hasOutstanding = Number(outstandingShares[tokenId]) > 0;
       const marketplaceContract = await web3Service.getMarketplaceContract();
@@ -179,6 +176,7 @@ const CancelListingPage = () => {
         await approveTx.wait();
       }
 
+      setStage(tokenId, 'cancel');
       const cancelTx = await marketplaceContract.cancelListing(tokenId, buyBackPrice);
       await cancelTx.wait();
 
@@ -203,7 +201,7 @@ const CancelListingPage = () => {
       console.error('Transaction error:', error);
       toast.error(getContractErrorMessage(error, 'Failed to cancel listing. Please try again.'));
     } finally {
-      setBusyId(null);
+      setStage(tokenId, null);
     }
   };
 
@@ -222,8 +220,8 @@ const CancelListingPage = () => {
     <AppLayout>
       <PageHeader
         eyebrow="Your assets"
-        title="Cancel Listing"
-        description="Delist your active assets and reclaim any unsold shares. Listings with an open buyback stay locked until the claim window closes."
+        title="Delist a Station"
+        description="Take a station off the marketplace. Unsold shares come straight back to you; if investors already hold shares, you fund a buyback so they can sell back at a premium before you reclaim the station."
         icon={
           <path
             strokeLinecap="round"
@@ -249,9 +247,12 @@ const CancelListingPage = () => {
             icon={<LockIcon />}
           />
           <StatCard
-            label="Eligible withdrawers"
-            value={userTokenBalances.length > 0 ? formatNumber(userTokenBalances.length, 0) : '—'}
-            sub="with matching wallet balance"
+            label="Your listings"
+            value={formatNumber(
+              assets.filter((a) => listingOwners[a.assetId]?.toLowerCase() === currentSigner?.toLowerCase()).length,
+              0,
+            )}
+            sub="stations you can delist"
             tone="brand"
             icon={<WalletIcon />}
           />
@@ -261,174 +262,53 @@ const CancelListingPage = () => {
       {loading ? (
         <AssetGridSkeleton />
       ) : assets.length > 0 ? (
-        <motion.div
-          variants={stagger}
-          initial="hidden"
-          animate="show"
-          className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3"
-        >
-          {assets.map((prop) => {
-            const tokenInfo = userTokenBalances.find((tkn) => tkn.assetId === prop.assetId);
-            const isOwner = listingOwners[prop.assetId]?.toLowerCase() === currentSigner?.toLowerCase();
-            const done = fractionalEvents[prop.assetId];
-            const shares = assetShares[prop.assetId];
-            const locked = lockedByBuyBack[prop.assetId];
-            const outstanding = Number(outstandingShares[prop.assetId] || 0);
-            const buyBackDeadline = buyBackDeadlines[prop.assetId];
-            const listingPrice = Number(listingPrices[prop.assetId] || 0);
-            const minBuyBackPrice = (listingPrice * MIN_BUYBACK_MULTIPLIER).toFixed(2);
-            const buyBackPriceInput = buyBackPrices[prop.assetId] || '';
-
+        <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-6">
+          {assets.map((station) => {
+            const tokenInfo = userTokenBalances.find((tkn) => tkn.assetId === station.assetId);
+            const isOwner = listingOwners[station.assetId]?.toLowerCase() === currentSigner?.toLowerCase();
+            const listingPrice = Number(listingPrices[station.assetId] || 0);
             return (
-              <motion.div key={prop.assetId} variants={rise} className="h-full">
-                <AssetCard asset={prop}>
-                  {done ? (
-                    <div className="rounded-xl border border-emerald-200/70 bg-emerald-50/60 p-3.5 dark:border-emerald-900/60 dark:bg-emerald-950/30">
-                      <Badge tone="success" dot>
-                        Delisted successfully
-                      </Badge>
-                      <p className="mt-2 text-xs leading-relaxed text-emerald-800/80 dark:text-emerald-200/70">
-                        {done.buyBackActivated
-                          ? 'The listing was closed, unsold shares were returned to your wallet, and a buyback was activated for outstanding shares.'
-                          : 'The listing was closed and any unsold shares were returned to your wallet.'}
-                      </p>
-                      {done.buyBackActivated && done.buyBackDeadline && (
-                        <>
-                          <p className="mt-2 flex items-center justify-between rounded-lg bg-white/60 px-3 py-2 text-xs font-semibold text-emerald-800 dark:bg-slate-900/40 dark:text-emerald-300">
-                            <span>Withdrawable from</span>
-                            <span className="tabular-nums">{formatDeadline(done.buyBackDeadline)}</span>
-                          </p>
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            fullWidth
-                            className="mt-2"
-                            onClick={() => (window.location.href = ROUTES.withdrawBuyBack)}
-                          >
-                            Go to Withdraw Buyback
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                  ) : tokenInfo && isOwner ? (
-                    <div className="space-y-2.5">
-                      <div className="space-y-1.5 rounded-xl bg-red-50/70 px-3.5 py-2.5 text-[13px] dark:bg-red-950/20">
-                        <Row label="Your current balance" value={`${formatNumber(tokenInfo.balance)} shares`} />
-                        <Row label="Total listed" value={`${formatNumber(shares)} shares`} />
-                        <Row label="Held by investors" value={`${formatNumber(outstanding)} shares`} />
-                        <p className="truncate pt-1 font-mono text-[10.5px] text-red-400/70 dark:text-red-300/50">
-                          {tokenInfo.tokenAddress}
-                        </p>
-                      </div>
-                      {locked ? (
-                        <div className="space-y-2 rounded-xl bg-amber-50 px-3.5 py-3 text-[12.5px] leading-relaxed text-amber-800 dark:bg-amber-950/20 dark:text-amber-300">
-                          <p>
-                            A funded buyback is still open on this listing. Withdraw the remaining escrow once the
-                            claim window closes, then delist.
-                          </p>
-                          {buyBackDeadline && (
-                            <p className="flex items-center justify-between rounded-lg bg-white/60 px-3 py-2 font-semibold dark:bg-slate-900/40">
-                              <span>Withdrawable from</span>
-                              <span className="tabular-nums">{formatDeadline(buyBackDeadline)}</span>
-                            </p>
-                          )}
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            fullWidth
-                            onClick={() => (window.location.href = ROUTES.withdrawBuyBack)}
-                          >
-                            Go to Withdraw Buyback
-                          </Button>
-                        </div>
-                      ) : (
-                        <>
-                          {outstanding > 0 && (
-                            <div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50/60 p-3 dark:border-amber-900/60 dark:bg-amber-950/20">
-                              <p className="text-[12.5px] leading-relaxed text-amber-800 dark:text-amber-300">
-                                {formatNumber(outstanding)} shares are still held by investors. Delisting requires
-                                setting a buyback price so they can sell back, The full cost is escrowed (pulled as
-                                USDC) from your wallet up front, in the same transaction.
-                              </p>
-                              <Input
-                                label="Buyback price per share (USDC)"
-                                type="number"
-                                min={minBuyBackPrice}
-                                step="0.01"
-                                value={buyBackPriceInput}
-                                onChange={(e) =>
-                                  setBuyBackPrices((prev) => ({ ...prev, [prop.assetId]: e.target.value }))
-                                }
-                                placeholder={`Min $${minBuyBackPrice}`}
-                                error={
-                                  buyBackPriceInput && Number(buyBackPriceInput) < Number(minBuyBackPrice)
-                                    ? `Must be at least $${minBuyBackPrice} — 10% above the $${listingPrice} listing price`
-                                    : undefined
-                                }
-                              />
-                              <div className="flex items-center justify-between rounded-lg bg-white/60 px-3 py-2 text-[12.5px] dark:bg-slate-900/40">
-                                <span className="font-medium text-amber-800 dark:text-amber-300">
-                                  USDC you&apos;ll approve &amp; escrow
-                                </span>
-                                <span className="font-bold text-amber-900 tabular-nums dark:text-amber-200">
-                                  {Number(buyBackPriceInput) > 0
-                                    ? `$${formatNumber(outstanding * Number(buyBackPriceInput))}`
-                                    : '—'}
-                                </span>
-                              </div>
-                            </div>
-                          )}
-                          <Button
-                            fullWidth
-                            variant="danger"
-                            loading={busyId === prop.assetId}
-                            disabled={outstanding > 0 && !(Number(buyBackPriceInput) >= Number(minBuyBackPrice))}
-                            onClick={() => cancelListing(prop.assetId, buyBackPriceInput)}
-                          >
-                            Delist asset
-                          </Button>
-                          <p className="text-center text-[11px] text-slate-400 dark:text-slate-500">
-                            {outstanding > 0
-                              ? 'Approves and escrows the USDC buyback deposit, then delists and returns unsold shares'
-                              : 'No USDC required — nothing is outstanding, so this just delists and returns unsold shares'}
-                          </p>
-                        </>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="rounded-xl bg-slate-50 px-3.5 py-3 text-center text-[13px] font-medium text-slate-400 dark:bg-slate-950/50 dark:text-slate-500">
-                      Listed by another wallet — only the listing owner can delist.
-                    </div>
-                  )}
-                </AssetCard>
+              <motion.div key={station.assetId} variants={rise}>
+                <CancelConsole
+                  asset={station}
+                  isOwner={isOwner}
+                  balance={tokenInfo?.balance}
+                  shareToken={tokenInfo?.tokenAddress}
+                  symbol={tokenInfo?.symbol}
+                  listed={Number(assetShares[station.assetId] || 0)}
+                  unsold={Number(unsoldShares[station.assetId] || 0)}
+                  outstanding={Number(outstandingShares[station.assetId] || 0)}
+                  listingPrice={listingPrice}
+                  minBuyBackPrice={Math.ceil(listingPrice * MIN_BUYBACK_MULTIPLIER * 100) / 100}
+                  locked={lockedByBuyBack[station.assetId]}
+                  deadline={buyBackDeadlines[station.assetId]}
+                  buyBackPrice={buyBackPrices[station.assetId] || ''}
+                  onBuyBackPrice={(value) => setBuyBackPrices((prev) => ({ ...prev, [station.assetId]: value }))}
+                  onCancel={() => cancelListing(station.assetId, buyBackPrices[station.assetId] || '')}
+                  stage={stages[station.assetId]}
+                  done={fractionalEvents[station.assetId]}
+                  onWithdraw={() => (window.location.href = ROUTES.withdrawBuyBack)}
+                />
               </motion.div>
             );
           })}
         </motion.div>
       ) : (
         <EmptyState
-          title="No active listings"
+          title="No live listings"
           action={
             <Button variant="soft" size="sm" onClick={() => (window.location.href = ROUTES.appMarketplace)}>
               Back to the marketplace
             </Button>
           }
         >
-          Your active marketplace listings appear here once you list a fractionalized asset for sale.
+          A station appears here while its shares are on sale on the marketplace.
         </EmptyState>
       )}
     </AppLayout>
   );
 };
 
-const Row = ({ label, value }) => (
-  <div className="flex items-center justify-between gap-3">
-    <span className="shrink-0 text-slate-400 dark:text-slate-500">{label}</span>
-    <span className="min-w-0 truncate text-right font-semibold text-slate-700 tabular-nums dark:text-slate-200">
-      {value}
-    </span>
-  </div>
-);
 
 const CancelIcon = () => (
   <svg className="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>

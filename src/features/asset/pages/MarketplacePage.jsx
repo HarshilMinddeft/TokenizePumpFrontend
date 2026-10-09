@@ -1,21 +1,21 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'motion/react';
 import PublicLayout from '../../../components/layout/PublicLayout';
 import AppLayout from '../../../components/layout/AppLayout';
-import AssetCard from '../components/AssetCard';
+import StationTile from '../components/StationTile';
+import InvestorDashboard from '../../rent/components/InvestorDashboard';
 import PageHeader from '../../../components/ui/PageHeader';
-import StatCard from '../../../components/ui/StatCard';
 import Skeleton from '../../../components/ui/Skeleton';
 import EmptyState from '../../../components/ui/EmptyState';
 import Input from '../../../components/ui/Input';
 import Button from '../../../components/ui/Button';
-import Badge from '../../../components/ui/Badge';
 import { getAssetDetailsPath, getAppAssetDetailsPath } from '../../../config/routes';
 import web3Service from '../../../services/web3Service';
 import assetApi from '../api/assetApi';
 import useAssetsFilteredBy from '../hooks/useAssetsFilteredBy';
 import { cn, formatNumber } from '../../../lib/utils';
+import { formatShares, formatStable } from '../../../utils/units';
 
 // cancelListing sets active = false in the same call that may open a
 // buyback, so a listing with a live buyback (holders can still sell back)
@@ -61,6 +61,11 @@ const MarketplacePage = ({ isPublic = false }) => {
   const detailPath = isPublic ? getAssetDetailsPath : getAppAssetDetailsPath;
 
   const navigate = useNavigate();
+  // Tab lives in the URL (?tab=dashboard) so it survives reloads and can be linked to
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab = searchParams.get('tab') === 'dashboard' ? 'dashboard' : 'assets';
+  const setTab = (next) => setSearchParams(next === 'dashboard' ? { tab: 'dashboard' } : {}, { replace: true });
+
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState('newest');
 
@@ -70,11 +75,11 @@ const MarketplacePage = ({ isPublic = false }) => {
     web3Service.getReadOnlyMarketplaceContract,
   );
 
-  // An asset can show up here either as a normal buyable listing or as a
-  // cancelled listing with a still-open buyback (isActivelyListed keeps
-  // both) — flag the latter so the card doesn't read as "buy now" for
-  // something that's actually delisted and only sellable back.
-  const [buyBackOnly, setBuyBackOnly] = useState({});
+  // Each station's on-chain listing: price per share, shares on sale, and
+  // whether it's actually a cancelled listing with a still-open buyback
+  // (isActivelyListed keeps those so holders can reach the sell-back page) —
+  // the tile must not read as "buy now" for those.
+  const [listings, setListings] = useState({});
 
   useEffect(() => {
     if (assets.length === 0) return;
@@ -82,16 +87,23 @@ const MarketplacePage = ({ isPublic = false }) => {
 
     (async () => {
       const marketplace = web3Service.getReadOnlyMarketplaceContract();
-      const flags = {};
+      const next = {};
       for (const prop of assets) {
         try {
-          const listing = await marketplace.listings(prop.assetId);
-          flags[prop.assetId] = !listing.active && listing.buyBack;
+          const l = await marketplace.listings(prop.assetId);
+          next[prop.assetId] = {
+            active: l.active,
+            buyBack: l.buyBack,
+            price: Number(formatStable(l.pricePerToken)),
+            buyBackPrice: l.buyBack ? Number(formatStable(l.buyBackPrice)) : null,
+            total: Number(formatShares(l.totalTokens)),
+            remaining: Number(formatShares(l.remainingTokens)),
+          };
         } catch (err) {
-          console.error(`Error checking buyback status for asset ${prop.assetId}:`, err);
+          console.error(`Error reading listing for asset ${prop.assetId}:`, err);
         }
       }
-      if (!cancelled) setBuyBackOnly(flags);
+      if (!cancelled) setListings(next);
     })();
 
     return () => {
@@ -112,24 +124,34 @@ const MarketplacePage = ({ isPublic = false }) => {
 
   const sorted = useMemo(() => {
     const list = [...filtered];
-    if (sort === 'price-high') list.sort((a, b) => Number(b.assetPrice) - Number(a.assetPrice));
-    if (sort === 'price-low') list.sort((a, b) => Number(a.assetPrice) - Number(b.assetPrice));
+    // Price = price per share (what an investor pays), falling back to the
+    // station value until the listing has loaded.
+    const priceOf = (p) => listings[p.assetId]?.price ?? Number(p.assetPrice);
+    if (sort === 'price-high') list.sort((a, b) => priceOf(b) - priceOf(a));
+    if (sort === 'price-low') list.sort((a, b) => priceOf(a) - priceOf(b));
     if (sort === 'size-high') list.sort((a, b) => Number(b.assetSize) - Number(a.assetSize));
     return list;
-  }, [filtered, sort]);
+  }, [filtered, sort, listings]);
 
   const totals = useMemo(() => {
     const totalValue = assets.reduce((sum, p) => sum + (Number(p.assetPrice) || 0), 0);
-    const totalSize = assets.reduce((sum, p) => sum + (Number(p.assetSize) || 0), 0);
-    return { totalValue, totalSize };
-  }, [assets]);
+    const live = assets.map((p) => listings[p.assetId]).filter((l) => l && l.active);
+    const sharesOnSale = live.reduce((sum, l) => sum + l.remaining, 0);
+    const prices = live.map((l) => l.price).filter((v) => v > 0);
+    return { totalValue, sharesOnSale, entry: prices.length ? Math.min(...prices) : null, ready: live.length > 0 };
+  }, [assets, listings]);
 
   return (
     <Layout>
       <PageHeader
         eyebrow="Explore"
-        title="Marketplace"
-        description="Browse tokenized real-world assets that are actively listed. Every asset is fractionalized, on-chain and verified before it reaches the floor."
+        title={tab === 'dashboard' ? 'My Portfolio' : 'Marketplace'}
+        description={
+          tab === 'dashboard'
+            ? 'The shares you hold, the income they earn and every trade you make.'
+            : 'Own a slice of a working fuel station — from one share, earning monthly.'
+        }
+        actions={<MarketTabs tab={tab} onChange={setTab} assetCount={loading ? null : assets.length} />}
         icon={
           <path
             strokeLinecap="round"
@@ -139,118 +161,191 @@ const MarketplacePage = ({ isPublic = false }) => {
         }
       />
 
-      {/* Market stats */}
-      <div className="mb-8 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-        <StatCard
-          label="Live listings"
-          value={loading ? '…' : formatNumber(assets.length, 0)}
-          tone="brand"
-          icon={<BuildingIcon />}
-        />
-        <StatCard
-          label="Assets on-chain"
-          value={loading ? '…' : `$${formatNumber(totals.totalValue, 0)}`}
-          sub="combined asset value"
-          tone="success"
-          icon={<DollarIcon />}
-        />
-        <StatCard
-          label="Total floor area"
-          value={loading ? '…' : `${formatNumber(totals.totalSize, 0)} sqft`}
-          sub="across active listings"
-          tone="neutral"
-          icon={<AreaIcon />}
-        />
-        <StatCard
-          label="Avg asset value"
-          value={loading || !assets.length ? '—' : `$${formatNumber(totals.totalValue / assets.length, 0)}`}
-          sub="per listing"
-          tone="warning"
-          icon={<TrendIcon />}
-        />
-      </div>
-
-      {/* Toolbar */}
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative w-full sm:max-w-sm">
-          <Input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by name, location or ID…"
-            aria-label="Search assets"
-            leadingIcon={
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"
-                />
-              </svg>
-            }
-          />
-        </div>
-
-        <div className="flex items-center gap-2">
-          <span className="hidden text-xs font-medium text-slate-400 sm:block dark:text-slate-500">
-            {loading ? 'Syncing…' : `${sorted.length} of ${assets.length} assets`}
-          </span>
-          <SortPills sort={sort} onChange={setSort} />
-        </div>
-      </div>
-
-      {loading ? (
-        <GridSkeleton />
-      ) : sorted.length > 0 ? (
-        <motion.div
-          key={`${sort}-${filtered.length}`}
-          variants={container}
-          initial="hidden"
-          animate="show"
-          className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3"
-        >
-          {sorted.map((prop) => (
-            <motion.div key={prop.assetId} variants={item} className="h-full">
-              <AssetCard asset={prop} onClick={() => navigate(detailPath(prop.assetId))}>
-                {buyBackOnly[prop.assetId] && (
-                  <Badge tone="warning" dot>
-                    Buyback open — not for sale
-                  </Badge>
-                )}
-              </AssetCard>
-            </motion.div>
-          ))}
-        </motion.div>
-      ) : query ? (
-        <EmptyState
-          title="No matching assets"
-          icon={<SearchIcon />}
-          action={
-            <Button variant="secondary" size="sm" onClick={() => setQuery('')}>
-              Clear search
-            </Button>
-          }
-        >
-          Nothing matched “{query}”. Try a different name, location or asset ID.
-        </EmptyState>
+      {tab === 'dashboard' ? (
+        <InvestorDashboard detailPath={detailPath} onBrowse={() => setTab('assets')} />
       ) : (
-        <EmptyState
-          title="No assets are currently listed"
-          action={
-            <Button
-              variant="soft"
-              size="sm"
-              onClick={() => navigate('/fractionalize-asset')}
+        <>
+          {/* Market board: the numbers and the controls in one panel */}
+          <section className="mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
+            <dl className="grid grid-cols-2 divide-slate-100 lg:grid-cols-4 lg:divide-x dark:divide-slate-800">
+              <BoardStat label="Live stations" value={loading ? '…' : formatNumber(assets.length, 0)} />
+              <BoardStat
+                label="Value on-chain"
+                value={loading ? '…' : `$${formatNumber(totals.totalValue, 0)}`}
+              />
+              <BoardStat
+                label="Shares on sale"
+                value={loading || !totals.ready ? '…' : formatNumber(totals.sharesOnSale, 0)}
+              />
+              <BoardStat
+                label="Entry from"
+                value={loading || !totals.ready ? '…' : totals.entry ? `$${formatNumber(totals.entry, 2)}` : '—'}
+                sub="/ share"
+                highlight
+              />
+            </dl>
+
+            <div className="flex flex-col gap-3 border-t border-slate-100 bg-slate-50/60 px-4 py-3 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800 dark:bg-black/20">
+              <div className="relative w-full sm:max-w-sm">
+                <Input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search by name, location or ID…"
+                  aria-label="Search assets"
+                  leadingIcon={
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"
+                      />
+                    </svg>
+                  }
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="hidden text-xs font-medium text-slate-400 sm:block dark:text-slate-500">
+                  {loading ? 'Syncing…' : `${sorted.length} of ${assets.length} stations`}
+                </span>
+                <SortPills sort={sort} onChange={setSort} />
+              </div>
+            </div>
+          </section>
+
+          {loading ? (
+            <GridSkeleton />
+          ) : sorted.length > 0 ? (
+            <motion.div
+              key={`${sort}-${filtered.length}`}
+              variants={container}
+              initial="hidden"
+              animate="show"
+              className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3"
             >
-              Go to your assets
-            </Button>
-          }
-        >
-          When an asset owner lists shares on the marketplace they will appear here. Check back soon.
-        </EmptyState>
+              {sorted.map((prop) => (
+                <motion.div key={prop.assetId} variants={item} className="h-full">
+                  <StationTile
+                    asset={prop}
+                    listing={listings[prop.assetId]}
+                    onOpen={() => navigate(detailPath(prop.assetId))}
+                  />
+                </motion.div>
+              ))}
+            </motion.div>
+          ) : query ? (
+            <EmptyState
+              title="No matching assets"
+              icon={<SearchIcon />}
+              action={
+                <Button variant="secondary" size="sm" onClick={() => setQuery('')}>
+                  Clear search
+                </Button>
+              }
+            >
+              Nothing matched “{query}”. Try a different name, location or asset ID.
+            </EmptyState>
+          ) : (
+            <EmptyState
+              title="No assets are currently listed"
+              action={
+                <Button
+                  variant="soft"
+                  size="sm"
+                  onClick={() => navigate('/fractionalize-asset')}
+                >
+                  Go to your assets
+                </Button>
+              }
+            >
+              When an asset owner lists shares on the marketplace they will appear here. Check back soon.
+            </EmptyState>
+          )}
+        </>
       )}
     </Layout>
   );
 };
+
+const TABS = [
+  {
+    value: 'assets',
+    label: 'Explore',
+    icon: 'M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21',
+  },
+  {
+    value: 'dashboard',
+    label: 'My Portfolio',
+    icon: 'M10.5 6a7.5 7.5 0 1 0 7.5 7.5h-7.5V6Z M13.5 10.5H21A7.5 7.5 0 0 0 13.5 3v7.5Z',
+  },
+];
+
+const MarketTabs = ({ tab, onChange, assetCount }) => (
+  <div
+    role="tablist"
+    aria-label="Marketplace view"
+    className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white p-1 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+  >
+    {TABS.map((t) => {
+      const active = tab === t.value;
+      return (
+        <button
+          key={t.value}
+          type="button"
+          role="tab"
+          aria-selected={active}
+          onClick={() => onChange(t.value)}
+          className={cn(
+            'relative flex cursor-pointer items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors',
+            active ? 'text-white' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200',
+          )}
+        >
+          {active && (
+            <motion.span
+              layoutId="market-tab"
+              className="absolute inset-0 rounded-lg bg-gradient-to-br from-indigo-600 to-violet-600 shadow-md shadow-indigo-600/25"
+              transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+            />
+          )}
+          <svg className="relative h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+            <path strokeLinecap="round" strokeLinejoin="round" d={t.icon} />
+          </svg>
+          <span className="relative">{t.label}</span>
+          {t.value === 'assets' && assetCount !== null && (
+            <span
+              className={cn(
+                'relative rounded-full px-1.5 py-px text-[11px] font-bold tabular-nums',
+                active
+                  ? 'bg-white text-indigo-700'
+                  : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
+              )}
+            >
+              {assetCount}
+            </span>
+          )}
+        </button>
+      );
+    })}
+  </div>
+);
+
+/** One cell of the market board — a ticker-style figure. */
+const BoardStat = ({ label, value, sub, highlight = false }) => (
+  <div className="border-slate-100 px-5 py-4 odd:border-r [&:nth-child(-n+2)]:border-b lg:border-0 dark:border-slate-800">
+    <dt className="font-mono text-[10px] tracking-[0.18em] text-slate-400 uppercase dark:text-slate-500">{label}</dt>
+    <dd
+      className={cn(
+        'mt-1.5 text-2xl font-bold tracking-tight tabular-nums',
+        highlight
+          ? 'text-amber-600 dark:text-amber-300 dark:[text-shadow:0_0_14px_rgba(252,211,77,0.35)]'
+          : 'text-slate-900 dark:text-white',
+      )}
+    >
+      {value}
+      {sub && <span className="ml-1 text-xs font-medium text-slate-400 dark:text-slate-500">{sub}</span>}
+    </dd>
+  </div>
+);
 
 const SortPills = ({ sort, onChange }) => {
   const options = [
@@ -278,42 +373,6 @@ const SortPills = ({ sort, onChange }) => {
     </div>
   );
 };
-
-const BuildingIcon = () => (
-  <svg className="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21"
-    />
-  </svg>
-);
-
-const DollarIcon = () => (
-  <svg className="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182.552-.44 1.278-.659 2.003-.659.725 0 1.45.22 2.003.659L14.5 8.5"
-    />
-  </svg>
-);
-
-const AreaIcon = () => (
-  <svg className="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15"
-    />
-  </svg>
-);
-
-const TrendIcon = () => (
-  <svg className="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18 9 11.25l4.306 4.306a11.95 11.95 0 0 1 5.814-5.518l2.74-1.22m0 0-5.94-2.281m5.94 2.28-2.28 5.941" />
-  </svg>
-);
 
 const SearchIcon = () => (
   <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>

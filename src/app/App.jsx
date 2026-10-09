@@ -10,6 +10,7 @@ import UpdatePricePage from '../features/asset/pages/UpdatePricePage';
 import CancelListingPage from '../features/asset/pages/CancelListingPage';
 import AssetDetailPage from '../features/asset/pages/AssetDetailPage';
 import UpdateBuyBackBPS from '../features/asset/pages/UpdateBuyBackBPS';
+import RentDistributionPage from '../features/rent/pages/RentDistributionPage';
 import { ROUTES, getAssetDetailsPath, getAppAssetDetailsPath } from '../config/routes';
 import './App.css';
 
@@ -43,6 +44,12 @@ function App() {
       <Route path={ROUTES.appAssetDetails} element={<AssetDetailPage />} />
 
       <Route path={ROUTES.updateBuyBackBPS} element={<UpdateBuyBackBPS />} />
+      {/* The investor dashboard is a tab on the marketplace */}
+      <Route
+        path={ROUTES.investorDashboard}
+        element={<Navigate to={`${ROUTES.appMarketplace}?tab=dashboard`} replace />}
+      />
+      <Route path={ROUTES.rentDistribution} element={<RentDistributionPage />} />
 
       <Route path="/property/:id" element={<LegacyAssetRedirect />} />
       <Route path="/properties/:id" element={<LegacyAssetRedirect />} />

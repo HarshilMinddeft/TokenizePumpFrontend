@@ -153,6 +153,11 @@ export const web3Service = {
     return new ethers.Contract(contractsConfig.orderBook.address, contractsConfig.orderBook.abi, signer);
   },
 
+  getRentDistributorContract: async () => {
+    const signer = await web3Service.getSigner();
+    return new ethers.Contract(contractsConfig.rentDistributor.address, contractsConfig.rentDistributor.abi, signer);
+  },
+
   /**
    * Share token (ERC-3643) for a listing, bound to the connected signer.
    * Each asset has its own token address, so this can't be a fixed
@@ -170,6 +175,32 @@ export const web3Service = {
    * (the AccessControl super-admin), since either should be allowed to
    * mint. Read-only, so it works even before a signer is available.
    */
+  /**
+   * Asks the connected wallet to show an NFT (EIP-747 wallet_watchAsset,
+   * type ERC721 — supported by MetaMask; other wallets may reject it).
+   * The connected account must own the token. Resolves true if the wallet
+   * accepted, false if the user declined; throws if the wallet can't do it.
+   */
+  watchNft: async (address, tokenId) => {
+    if (!activeWalletProvider) throw new Error('No wallet connected');
+    return activeWalletProvider.request({
+      method: 'wallet_watchAsset',
+      params: { type: 'ERC721', options: { address, tokenId: String(tokenId) } },
+    });
+  },
+
+  /**
+   * Asks the connected wallet to track an ERC-20 (EIP-747 wallet_watchAsset).
+   * MetaMask caps symbols at 11 characters, so longer ones are shortened.
+   */
+  watchToken: async ({ address, symbol, decimals = 0 }) => {
+    if (!activeWalletProvider) throw new Error('No wallet connected');
+    return activeWalletProvider.request({
+      method: 'wallet_watchAsset',
+      params: { type: 'ERC20', options: { address, symbol: String(symbol || 'SHARE').slice(0, 11), decimals } },
+    });
+  },
+
   isAssetNftAdmin: async (address) => {
     if (!address) return false;
     try {

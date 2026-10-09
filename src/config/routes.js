@@ -8,6 +8,8 @@ export const ROUTES = {
   updatePrice: '/update-price',
   cancelListing: '/cancel-listing',
   updateBuyBackBPS: '/update-buyback-bps',
+  investorDashboard: '/investor-dashboard',
+  rentDistribution: '/rent-distribution',
   // Public, no-sidebar marketplace for normal visitors who haven't
   // connected a wallet — this is what the landing page links to.
   marketplace: '/marketplace',

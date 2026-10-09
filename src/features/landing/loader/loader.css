@@ -1,0 +1,55 @@
+/* VARELO loader — "fuelling" preloader. Fonts: Bricolage Grotesque 800, IBM Plex Mono 400/600. */
+.vl{position:fixed;inset:0;z-index:100;overflow:hidden;display:grid;place-items:center;padding:24px;color:#eef1f7;
+  background:radial-gradient(120% 80% at 50% 30%,#241a10 0%,#120c07 60%,#0a0704 100%)}
+.vl-grid{position:absolute;inset:0;pointer-events:none;background-size:56px 56px;
+  background-image:linear-gradient(rgba(227,183,102,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(227,183,102,.06) 1px,transparent 1px);
+  -webkit-mask-image:radial-gradient(70% 60% at 50% 45%,#000,transparent);mask-image:radial-gradient(70% 60% at 50% 45%,#000,transparent)}
+/* rising fuel level behind the card — driven by JS via transform only */
+.vl-tank{position:absolute;inset:0;transform:translateY(100%);will-change:transform;pointer-events:none;
+  background:linear-gradient(180deg,rgba(255,180,74,.16),rgba(227,183,102,.05))}
+.vl-wave{position:absolute;left:-24px;right:0;top:-10px;height:12px;will-change:transform;
+  background:radial-gradient(12px 7px at 12px 12px,rgba(255,180,74,.22) 98%,transparent 100%);background-size:24px 12px;animation:vlWave 2.4s linear infinite}
+.vl-surface{position:absolute;left:0;right:0;top:0;height:1px;background:linear-gradient(90deg,transparent,rgba(255,180,74,.7),transparent);box-shadow:0 0 18px rgba(255,180,74,.6)}
+
+.vl-card{position:relative;width:min(440px,100%);display:flex;flex-direction:column;gap:22px;padding:28px 28px 24px;border-radius:20px;
+  background:rgba(26,20,14,.95);border:1px solid rgba(227,183,102,.28);box-shadow:0 30px 80px rgba(0,0,0,.55);animation:vlFadeUp .7s .1s both}
+.vl-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.vl-brand{display:flex;align-items:center;gap:10px}
+.vl-brand img{height:34px;width:auto;display:block}
+.vl-word{font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:24px;letter-spacing:.08em;
+  background:linear-gradient(90deg,#e3b766 0%,#fff3d6 50%,#e3b766 100%);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:vlShine 2.8s linear infinite}
+.vl-mono{font-family:'IBM Plex Mono',monospace;text-transform:uppercase}
+.vl-live{display:flex;align-items:center;gap:6px;font-size:10.5px;letter-spacing:.14em;color:#5ccf8e}
+.vl-live i{width:6px;height:6px;border-radius:50%;background:#5ccf8e;box-shadow:0 0 8px #5ccf8e;animation:vlPulse 1.4s ease-in-out infinite}
+
+.vl-pump{display:flex;flex-direction:column;gap:6px;padding:18px 18px 14px;border-radius:12px;background:#0d0906;border:1px solid rgba(227,183,102,.18)}
+.vl-pump-labels{display:flex;justify-content:space-between;font-size:10.5px;letter-spacing:.14em;color:#aab3c9}
+.vl-pump-row{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.vl-pct{font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:clamp(44px,9vw,60px);line-height:1;color:#ffb44a;font-variant-numeric:tabular-nums;text-shadow:0 0 18px rgba(255,180,74,.45)}
+.vl-tok{font-family:'IBM Plex Mono',monospace;font-size:15px;color:#e8d3a6;font-variant-numeric:tabular-nums}
+
+.vl-streams{display:flex;flex-direction:column;gap:14px}
+.vl-row{display:grid;grid-template-columns:28px minmax(0,1fr) auto;align-items:center;gap:12px;--c:#e8d3a6}
+.vl-row[data-k="B"]{--c:#ffb44a}.vl-row[data-k="C"]{--c:#5ccf8e}
+.vl-badge{display:grid;place-items:center;width:28px;height:28px;border-radius:8px;border:1px solid var(--c);color:var(--c);font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600}
+.vl-col{display:flex;flex-direction:column;gap:6px;min-width:0}
+.vl-label{font-size:11px;letter-spacing:.12em;color:#cfd6e6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vl-track{position:relative;height:4px;border-radius:4px;background:rgba(227,183,102,.14);overflow:hidden}
+.vl-bar{position:absolute;inset:0;transform-origin:0 50%;transform:scaleX(0);background:var(--c);box-shadow:0 0 10px var(--c)}
+.vl-tick{font-family:'IBM Plex Mono',monospace;font-size:11px;color:#aab3c9;opacity:.35;transition:opacity .3s,color .3s}
+.vl-row.is-done .vl-tick{opacity:1;color:var(--c)}
+
+.vl-foot{display:flex;align-items:center;gap:10px;padding-top:14px;border-top:1px solid rgba(227,183,102,.16)}
+.vl-merge{flex:1;height:2px;border-radius:2px;background:linear-gradient(90deg,#e8d3a6,#ffb44a,#5ccf8e);transform-origin:0 50%;transform:scaleX(0);box-shadow:0 0 12px rgba(227,183,102,.6);transition:transform .5s cubic-bezier(.65,0,.35,1)}
+.vl-one{font-size:11px;letter-spacing:.12em;color:#aab3c9;transition:color .3s}
+.vl.is-merged .vl-merge{transform:scaleX(1)}
+.vl.is-merged .vl-one{color:#e3b766}
+.vl-kicker{position:absolute;bottom:clamp(18px,4vh,36px);left:0;right:0;text-align:center;font-size:13px;font-weight:600;letter-spacing:.18em;color:#ffe7bd;
+  text-shadow:0 0 10px rgba(255,180,74,.75),0 0 24px rgba(227,183,102,.45);animation:vlFadeUp .8s .4s both,vlGlow 2.8s 1.2s ease-in-out infinite}
+@keyframes vlGlow{0%,100%{text-shadow:0 0 10px rgba(255,180,74,.75),0 0 24px rgba(227,183,102,.45)}50%{text-shadow:0 0 14px rgba(255,180,74,.95),0 0 34px rgba(227,183,102,.6)}}
+
+@keyframes vlFadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes vlWave{from{transform:translateX(0)}to{transform:translateX(24px)}}
+@keyframes vlShine{from{background-position:-200% 0}to{background-position:200% 0}}
+@keyframes vlPulse{0%,100%{opacity:.35}50%{opacity:1}}
+@media (prefers-reduced-motion:reduce){.vl *{animation:none!important}}
